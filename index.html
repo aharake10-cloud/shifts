@@ -11,31 +11,56 @@
 <script>
 const cfg={apiKey:"AIzaSyD2KTtnwgH8h8oNe0OLx_SH_ySYTIKyhns",authDomain:"schedule-7ed1c.firebaseapp.com",projectId:"schedule-7ed1c",storageBucket:"schedule-7ed1c.firebasestorage.app",messagingSenderId:"318015595165",appId:"1:318015595165:web:3ed77bc7952aeb5d77aa74"};
 firebase.initializeApp(cfg);
-const _db=firebase.firestore();
-const _auth=firebase.auth();
+const _db  = firebase.firestore();
+const _auth = firebase.auth();
 
-// Wrap compat API to match the modular API shape the rest of the code expects
-window.__fb={
-  db:_db, auth:_auth,
-  collection:(db,col)=>db.collection(col),
-  addDoc:(ref,data)=>ref.add(data),
-  getDocs:(ref)=>ref.get(),
-  doc:(db,col,id)=>db.collection(col).doc(id),
-  updateDoc:(ref,data)=>ref.update(data),
-  deleteDoc:(ref)=>ref.delete(),
-  setDoc:(ref,data)=>ref.set(data),
-  getDoc:(ref)=>ref.get(),
-  query:(ref,...constraints)=>{
-    let q=ref;
-    constraints.forEach(c=>{if(c&&c.__type==='orderBy')q=q.orderBy(c.field,c.dir);});
+window.__fb = {
+  db:   _db,
+  auth: _auth,
+
+  // collection ref
+  collection: (db, col) => db.collection(col),
+
+  // add doc → returns {id}
+  addDoc: (ref, data) => ref.add(data),
+
+  // get all docs in a query/collection
+  getDocs: (ref) => ref.get(),
+
+  // doc ref
+  doc: (db, col, id) => db.collection(col).doc(id),
+
+  // update
+  updateDoc: (ref, data) => ref.update(data),
+
+  // delete
+  deleteDoc: (ref) => ref.delete(),
+
+  // set (create/overwrite)
+  setDoc: (ref, data, opts) => opts ? ref.set(data, opts) : ref.set(data),
+
+  // get single doc
+  getDoc: (ref) => ref.get(),
+
+  // query builder — chains orderBy calls
+  query: (ref, ...constraints) => {
+    let q = ref;
+    constraints.forEach(c => {
+      if (!c) return;
+      if (c.__type === 'orderBy') q = q.orderBy(c.field, c.dir);
+      if (c.__type === 'where')   q = q.where(c.field, c.op, c.val);
+    });
     return q;
   },
-  orderBy:(field,dir='asc')=>({__type:'orderBy',field,dir}),
-  where:(field,op,val)=>({__type:'where',field,op,val}),
-  signInWithEmailAndPassword:(auth,email,pass)=>auth.signInWithEmailAndPassword(email,pass),
-  signOut:(auth)=>auth.signOut(),
-  onAuthStateChanged:(auth,cb)=>auth.onAuthStateChanged(cb),
-  createUserWithEmailAndPassword:(auth,email,pass)=>auth.createUserWithEmailAndPassword(email,pass),
+
+  orderBy: (field, dir='asc') => ({ __type:'orderBy', field, dir }),
+  where:   (field, op, val)   => ({ __type:'where', field, op, val }),
+
+  // auth methods — compat auth already has these directly
+  signInWithEmailAndPassword:   (auth, email, pass) => auth.signInWithEmailAndPassword(email, pass),
+  signOut:                      (auth)              => auth.signOut(),
+  onAuthStateChanged:           (auth, cb)          => auth.onAuthStateChanged(cb),
+  createUserWithEmailAndPassword:(auth, email, pass)=> auth.createUserWithEmailAndPassword(email, pass),
 };
 </script>
 <style>
@@ -756,8 +781,8 @@ let cellShiftType='';
 // Firebase is loaded synchronously via compat SDK
 (function init(){
   if(!window.__fb){console.error('Firebase not loaded');return;}
-  fb=window.__fb;db=fb.db;auth=fb.auth;
-  fb.onAuthStateChanged(auth,async user=>{
+  fb=window.__fb; db=fb.db; auth=_auth;
+  _auth.onAuthStateChanged(async user=>{
     if(new URLSearchParams(location.search).has('form')){
       el('auth-screen').style.display='none';
       el('pub-form').style.display='flex';
@@ -821,15 +846,19 @@ function toast(msg,type=''){
 // ══════════════════════════════════════
 async function doLogin(){
   const err=el('aerr');err.style.display='none';
-  try{await fb.signInWithEmailAndPassword(auth,v('ae'),v('ap'));}
+  const email=v('ae'), pass=v('ap');
+  if(!email||!pass){err.textContent='Enter email and password.';err.style.display='block';return;}
+  try{ await _auth.signInWithEmailAndPassword(email, pass); }
   catch(x){err.textContent=x.message;err.style.display='block';}
 }
 async function doRegister(){
   const err=el('aerr');err.style.display='none';
-  try{await fb.createUserWithEmailAndPassword(auth,v('ae'),v('ap'));toast('Account created!','ok');}
+  const email=v('ae'), pass=v('ap');
+  if(!email||!pass){err.textContent='Enter email and password.';err.style.display='block';return;}
+  try{ await _auth.createUserWithEmailAndPassword(email, pass); toast('Account created!','ok'); }
   catch(x){err.textContent=x.message;err.style.display='block';}
 }
-async function doLogout(){await fb.signOut(auth);el('emp-portal').style.display='none';}
+async function doLogout(){ await _auth.signOut(); el('emp-portal').style.display='none'; }
 
 // ══════════════════════════════════════
 // NAV
