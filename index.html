@@ -1780,6 +1780,7 @@ async function submitPortalSwitch(){
   btn.disabled=false;btn.textContent='Submit switch request';
 }
 
+function switchFormType(type){
   el('ftype-week').classList.toggle('active',type==='week');
   el('ftype-switch').classList.toggle('active',type==='switch');
   el('fform-week').style.display=type==='week'?'block':'none';
@@ -1987,8 +1988,6 @@ window.switchFormType=switchFormType; window.switchPortalTab=switchPortalTab;
 window.openDayPrefModal=openDayPrefModal; window.pickDayPref=pickDayPref;
 window.submitPortalRequest=submitPortalRequest; window.selectSwitchDay=selectSwitchDay;
 window.submitPortalSwitch=submitPortalSwitch; window.pickType=pickType;
-
-});
 
 // ══════════════════════════════════════
 // WIRE ALL BUTTONS — runs synchronously
