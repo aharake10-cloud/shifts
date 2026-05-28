@@ -406,9 +406,7 @@ details.card>summary::-webkit-details-marker{display:none;}
         <div class="sched-outer"><table class="sched-tbl" id="sched-tbl"></table></div>
         <div class="flex gap-3 fw mt3" style="font-size:.75rem;color:var(--grey-400);font-weight:600;">
           <span style="color:#1a7a6a">● AM</span>
-          <span style="color:var(--success)">● PM</span>
-          <span style="color:#5c3aaa">● Overnight</span>
-          <span style="color:#a05a00">● Mid</span>
+          <span style="color:var(--success)">● PM</span> <span style="color:#a05a00">● Mid</span>
           <span style="color:var(--red)">● OFF / Leave</span>
         </div>
       </div>
@@ -442,8 +440,7 @@ details.card>summary::-webkit-details-marker{display:none;}
       <div id="build-content" style="display:none">
         <div class="sched-outer"><table class="sched-tbl" id="build-tbl"></table></div>
         <div class="flex gap-3 fw mt3" style="font-size:.75rem;color:var(--grey-400);font-weight:600;">
-          <span style="color:#1a7a6a">● AM</span><span style="color:var(--success)">● PM</span>
-          <span style="color:#5c3aaa">● Overnight</span><span style="color:#a05a00">● Mid</span>
+          <span style="color:#1a7a6a">● AM</span><span style="color:var(--success)">● PM</span> <span style="color:#a05a00">● Mid</span>
           <span style="color:var(--red)">● OFF</span>
           <span style="border:2px dashed var(--primary-mid);padding:0 6px;border-radius:4px;color:var(--primary)">dashed = from approved request</span>
         </div>
@@ -533,7 +530,6 @@ details.card>summary::-webkit-details-marker{display:none;}
         <div class="stype-btn" data-v="AM">AM</div>
         <div class="stype-btn" data-v="PM">PM</div>
         <div class="stype-btn" data-v="Mid">Mid</div>
-        <div class="stype-btn" data-v="Overnight">Overnight</div>
         <div class="stype-btn" data-v="OFF">OFF</div>
         <div class="stype-btn" data-v="Paid">Paid leave</div>
         <div class="stype-btn" data-v="Leave">Unpaid leave</div>
@@ -667,6 +663,7 @@ details.card>summary::-webkit-details-marker{display:none;}
         <div class="frow"><label>Colleague to Switch With</label>
           <select id="psw-colleague"><option value="">— Select colleague —</option></select>
         </div>
+        <div id="psw-colleague-shift" style="display:none;font-size:.82rem;font-weight:600;color:var(--grey-600);background:var(--grey-50);border-radius:var(--r2);padding:.5rem .8rem;margin-bottom:.75rem"></div>
         <div class="frow"><label>Reason (optional)</label><textarea id="psw-reason" rows="2" placeholder="e.g. personal appointment"></textarea></div>
         <div class="ferror" id="psw-err"></div>
         <button class="btn btn-green wf" id="btn-portal-sw">Submit switch request</button>
@@ -686,7 +683,6 @@ details.card>summary::-webkit-details-marker{display:none;}
       <div class="stype-btn" data-v="AM">AM</div>
       <div class="stype-btn" data-v="PM">PM</div>
       <div class="stype-btn" data-v="Mid">Mid</div>
-      <div class="stype-btn" data-v="Overnight">Overnight</div>
     </div>
   </div>
 </div>
@@ -734,11 +730,11 @@ details.card>summary::-webkit-details-marker{display:none;}
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:1rem">
           <div class="frow" style="margin:0"><label>Your current shift</label>
             <select id="sw-myshift"><option value="">— Your shift —</option>
-              <option>AM</option><option>PM</option><option>Mid</option><option>Overnight</option></select>
+              <option>AM</option><option>PM</option><option>Mid</option></select>
           </div>
           <div class="frow" style="margin:0"><label>Their current shift</label>
             <select id="sw-othershift"><option value="">— Their shift —</option>
-              <option>AM</option><option>PM</option><option>Mid</option><option>Overnight</option></select>
+              <option>AM</option><option>PM</option><option>Mid</option></select>
           </div>
         </div>
         <div class="frow"><label>Reason (optional)</label><textarea id="sw-reason" rows="2" placeholder="e.g. personal appointment"></textarea></div>
@@ -761,10 +757,10 @@ details.card>summary::-webkit-details-marker{display:none;}
 const DAYS=['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
 const TASKS=['Calls','Zendesk','Emails'];
 const TCLS={Calls:'b-calls',Zendesk:'b-zendesk',Emails:'b-emails'};
-const SHIFT_BG={AM:'c-am',PM:'c-pm',Overnight:'c-over',Mid:'c-mid',OFF:'c-off',Paid:'c-paid',Leave:'c-leave'};
-const SHIFT_LC={AM:'lc-am',PM:'lc-pm',Overnight:'lc-over',Mid:'lc-mid',OFF:'lc-off',Paid:'lc-paid',Leave:'lc-leave'};
+const SHIFT_BG={AM:'c-am',PM:'c-pm',Mid:'c-mid',OFF:'c-off',Paid:'c-paid',Leave:'c-leave'};
+const SHIFT_LC={AM:'lc-am',PM:'lc-pm',Mid:'lc-mid',OFF:'lc-off',Paid:'lc-paid',Leave:'lc-leave'};
 const TASK_LC={Calls:'lc-calls',Zendesk:'lc-zendesk',Emails:'lc-emails'};
-const DEF={AM:{s:'08:00',e:'15:30'},PM:{s:'15:00',e:'23:00'},Mid:{s:'10:00',e:'18:00'},Overnight:{s:'23:00',e:'07:00'},OFF:{s:'',e:''},Paid:{s:'',e:''},Leave:{s:'',e:''}};
+const DEF={AM:{s:'08:00',e:'15:30'},PM:{s:'15:00',e:'23:00'},Mid:{s:'10:00',e:'18:00'},OFF:{s:'',e:''},Paid:{s:'',e:''},Leave:{s:'',e:''}};
 
 let fb,db,auth;
 let emps=[];
@@ -1199,7 +1195,7 @@ function openCellModal(empName,day,cell,wid){
   document.querySelectorAll('.stype-btn').forEach(b=>b.className='stype-btn');
   if(cellShiftType){
     const ab=document.querySelector(`.stype-btn[data-v="${cellShiftType}"]`);
-    if(ab) ab.className='stype-btn sel'+(cellShiftType==='OFF'?' sel-off':cellShiftType==='Overnight'?' sel-over':'');
+    if(ab) ab.className='stype-btn sel'+(cellShiftType==='OFF'?' sel-off':'');
   }
   el('cm-s').value=cell.start||'';el('cm-e').value=cell.end||'';el('cm-n').value=cell.note||'';
   toggleTimes(cellShiftType);
@@ -1217,7 +1213,7 @@ function openCellModal(empName,day,cell,wid){
 function pickType(btn){
   cellShiftType=btn.dataset.v;
   document.querySelectorAll('.stype-btn').forEach(b=>b.className='stype-btn');
-  btn.className='stype-btn sel'+(cellShiftType==='OFF'?' sel-off':cellShiftType==='Overnight'?' sel-over':'');
+  btn.className='stype-btn sel'+(cellShiftType==='OFF'?' sel-off':'');
   const dt=DEF[cellShiftType]||{s:'',e:''};
   el('cm-s').value=dt.s;el('cm-e').value=dt.e;
   toggleTimes(cellShiftType);
@@ -1343,7 +1339,7 @@ function exportExcel(){
   const tb={style:'thin',color:{rgb:'CCCCCC'}};
   const ab={top:tb,bottom:tb,left:tb,right:tb};
   const fills={AM:{patternType:'solid',fgColor:{rgb:'FFFFFF'}},PM:{patternType:'solid',fgColor:{rgb:'FFFFFF'}},
-    Overnight:{patternType:'solid',fgColor:{rgb:'ADD8E6'}},Mid:{patternType:'solid',fgColor:{rgb:'E3F2FF'}},
+Mid:{patternType:'solid',fgColor:{rgb:'E3F2FF'}},
     OFF:{patternType:'solid',fgColor:{rgb:'FFFF00'}},Paid:{patternType:'solid',fgColor:{rgb:'E0CCFF'}},
     Leave:{patternType:'solid',fgColor:{rgb:'E0CCFF'}},'default':{patternType:'solid',fgColor:{rgb:'F5F5F5'}}};
   // hdr1
@@ -1376,7 +1372,7 @@ function exportExcel(){
   wsData.push([
     {v:'Attendance From Office',s:{font:{...bf,color:{rgb:'FFFFFF'}},fill:{patternType:'solid',fgColor:{rgb:'808080'}},border:ab}},{v:''},
     {v:'Midnight (remotely)',s:{font:bf,fill:{patternType:'solid',fgColor:{rgb:'ADD8E6'}},border:ab}},{v:''},
-    {v:'Overnight',s:{font:{...bf,color:{rgb:'FFFFFF'}},fill:{patternType:'solid',fgColor:{rgb:'0070C0'}},border:ab}}
+
   ]);
   const ws=XLSX.utils.aoa_to_sheet(wsData);
   const cols=[{wch:22}];DAYS.forEach(()=>{cols.push({wch:8});cols.push({wch:8});});ws['!cols']=cols;
@@ -1491,7 +1487,7 @@ function renderReqs(){
       if(pref==='Any'&&!isDO) return '';
       const key=isDO?'dayOff':d;
       const st=isDO?(r.dayOffStatus||'pending'):(r.dayStatuses?.[d]||'pending');
-      const pclr=pref==='OFF'?'var(--a3)':pref==='AM'?'var(--a2)':pref==='PM'?'var(--ac)':pref==='Overnight'?'var(--a5)':pref==='Mid'?'var(--a4)':'var(--t2)';
+      const pclr=pref==='OFF'?'var(--a3)':pref==='AM'?'var(--a2)':pref==='PM'?'var(--ac)':pref==='Overnight'?'#888':pref==='Mid'?'var(--a4)':'var(--t2)';
       const bg=st==='approved'?'rgba(200,255,87,.07)':st==='rejected'?'rgba(255,107,107,.07)':'var(--s2)';
       const bdr=st==='approved'?'rgba(200,255,87,.35)':st==='rejected'?'rgba(255,107,107,.35)':'var(--bd2)';
       const tick=st==='approved'?'<span style="font-size:.52rem;color:var(--ac)"> ✓</span>':st==='rejected'?'<span style="font-size:.52rem;color:var(--a3)"> ✕</span>':'';
@@ -1643,36 +1639,40 @@ async function loadPortalRequest(){
 }
 
 function renderMyRequest(){
-  if(!myExistingRequest) return;
+  const existing=el('portal-existing-req');
+  if(!existing) return;
+
+  // Only show if a REAL request exists with a dayOff set
+  if(!myExistingRequest || !myExistingRequest.dayOff){
+    existing.style.display='none';
+    return;
+  }
+
   const r=myExistingRequest;
   const statusClr=r.status==='approved'?'var(--success)':r.status==='rejected'?'var(--red)':'var(--amber)';
   const statusTxt=r.status==='approved'?'✓ Approved':r.status==='rejected'?'✗ Rejected':'⏳ Pending review';
 
-  // Show a submitted request summary on the My Schedule tab
-  const existing=el('portal-existing-req');
-  if(existing){
-    existing.innerHTML=`
-      <div style="background:var(--white);border-radius:var(--r);box-shadow:var(--shadow);padding:1rem 1.25rem;margin-bottom:1rem;border-left:3px solid ${statusClr}">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem">
-          <div style="font-weight:700;font-size:.9rem">Your next week request</div>
-          <span style="font-size:.75rem;font-weight:700;color:${statusClr}">${statusTxt}</span>
-        </div>
-        <div style="font-size:.8rem;color:var(--grey-600)">Day off: <strong>${r.dayOff||'—'}</strong></div>
-        <div style="display:flex;flex-wrap:wrap;gap:.35rem;margin-top:.5rem">
-          ${DAYS.map(d=>{
-            const pref=d===r.dayOff?'OFF':(r.shiftPrefs?.[d]||'Any');
-            if(pref==='Any') return '';
-            const dst=r.dayStatuses?.[d]||'pending';
-            const bdr=dst==='approved'?'var(--success)':dst==='rejected'?'var(--red)':'var(--grey-200)';
-            return `<span style="font-size:.72rem;font-weight:600;padding:.2rem .55rem;border-radius:100px;border:1.5px solid ${bdr};color:var(--grey-900)">${d.slice(0,3)}: ${pref}</span>`;
-          }).filter(Boolean).join('')}
-        </div>
-        ${r.note?`<div style="font-size:.75rem;color:var(--grey-400);margin-top:.4rem;font-style:italic">"${r.note}"</div>`:''}
-      </div>`;
-    existing.style.display='block';
-  }
+  existing.innerHTML=`
+    <div style="background:var(--white);border-radius:var(--r);box-shadow:var(--shadow);padding:1rem 1.25rem;margin-bottom:1rem;border-left:3px solid ${statusClr}">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem">
+        <div style="font-weight:700;font-size:.9rem">Your next week request</div>
+        <span style="font-size:.75rem;font-weight:700;color:${statusClr}">${statusTxt}</span>
+      </div>
+      <div style="font-size:.8rem;color:var(--grey-600)">Day off: <strong>${r.dayOff}</strong></div>
+      <div style="display:flex;flex-wrap:wrap;gap:.35rem;margin-top:.5rem">
+        ${DAYS.map(d=>{
+          const pref=d===r.dayOff?'OFF':(r.shiftPrefs?.[d]||'Any');
+          if(pref==='Any') return '';
+          const dst=d===r.dayOff?(r.dayOffStatus||'pending'):(r.dayStatuses?.[d]||'pending');
+          const bdr=dst==='approved'?'var(--success)':dst==='rejected'?'var(--red)':'var(--grey-200)';
+          return `<span style="font-size:.72rem;font-weight:600;padding:.2rem .55rem;border-radius:100px;border:1.5px solid ${bdr};color:var(--grey-900)">${d.slice(0,3)}: ${pref}</span>`;
+        }).filter(Boolean).join('')}
+      </div>
+      ${r.note?`<div style="font-size:.75rem;color:var(--grey-400);margin-top:.4rem;font-style:italic">"${r.note}"</div>`:''}
+    </div>`;
+  existing.style.display='block';
 
-  // Pre-fill the request form with existing values
+  // Pre-fill request form with saved values
   if(r.dayOff) el('preq-dayoff').value=r.dayOff;
   if(r.shiftPrefs){
     DAYS.forEach(d=>{
@@ -1681,12 +1681,39 @@ function renderMyRequest(){
         portalDayPrefs[d]=pref;
         const p=el('preq-pref-'+d);
         const ch=el('preq-chip-'+d);
-        if(p){p.textContent=pref;const clr=pref==='AM'?'#1a7a6a':pref==='PM'?'#3a7a1a':pref==='Overnight'?'#5c3aaa':pref==='Mid'?'#a05a00':'var(--grey-600)';p.style.color=clr;}
+        if(p){p.textContent=pref;const clr=pref==='AM'?'#1a7a6a':pref==='PM'?'#3a7a1a':pref==='Overnight'?'#888':pref==='Mid'?'#a05a00':'var(--grey-600)';p.style.color=clr;}
         if(ch){ch.style.borderColor='var(--primary)';ch.style.background='var(--primary-light)';}
       }
     });
   }
   if(r.note) el('preq-note').value=r.note;
+}
+
+function renderPortalDays(){
+  const row=portalWeek?.rows?.find(r=>r.name===portalEmpName);
+  // Show schedule section regardless — empty days = no shift assigned yet
+  el('portal-sched-content').style.display='block';
+  el('portal-sched-empty').style.display='none';
+  const shiftBg={AM:'#f0faf8',PM:'#f5fbef',Mid:'#fff8ec',OFF:'#fff4f4',Paid:'#f5f0ff',Leave:'#f5f0ff','':'#f9f9fb'};
+  const shiftClr={AM:'#1a7a6a',PM:'#3a7a1a',Mid:'#a05a00',OFF:'var(--red)',Paid:'#5c3aaa',Leave:'#5c3aaa','':'var(--grey-400)'};
+  const taskClr={Calls:'#1a7a6a',Zendesk:'#3a7a1a',Emails:'var(--blue)','—':'var(--grey-400)'};
+  el('portal-days').innerHTML=DAYS.map(d=>{
+    const c=row?.days[d]||{shift:'',start:'',end:'',task:'—'};
+    const bg=shiftBg[c.shift]||shiftBg[''];
+    const clr=shiftClr[c.shift]||shiftClr[''];
+    const tclr=taskClr[c.task]||taskClr['—'];
+    const dateStr=portalWeek?.startDate?dayDate(portalWeek.startDate,d):'';
+    return `<div style="background:var(--white);border-radius:var(--r);box-shadow:var(--shadow);padding:1rem 1.25rem;display:flex;align-items:center;justify-content:space-between;gap:1rem">
+      <div>
+        <div style="font-weight:700;font-size:.9rem;color:var(--grey-900)">${d} <span style="font-weight:400;font-size:.78rem;color:var(--grey-400)">${dateStr}</span></div>
+        ${c.shift?`<div style="font-size:.78rem;color:var(--grey-400);margin-top:2px">${c.start&&c.end?c.start+' – '+c.end:''}</div>`:''}
+      </div>
+      <div style="display:flex;align-items:center;gap:.65rem">
+        <span style="background:${bg};color:${clr};font-weight:700;font-size:.78rem;padding:.28rem .75rem;border-radius:100px">${c.shift||'Not set'}</span>
+        ${c.shift&&c.shift!=='OFF'&&c.shift!=='Paid'&&c.shift!=='Leave'&&c.task&&c.task!=='—'?`<span style="color:${tclr};font-size:.78rem;font-weight:700;padding:.28rem .75rem;border-radius:100px;background:${tclr==='#1a7a6a'?'#e6f9f6':tclr==='#3a7a1a'?'#f0fae5':'var(--blue-light)'}">${c.task}</span>`:''}
+      </div>
+    </div>`;
+  }).join('');
 }
 
 function switchPortalTab(tab){
@@ -1713,33 +1740,6 @@ async function loadPortalSchedule(){
     renderPortalDays();
   }catch(e){el('portal-sched-empty').style.display='block';}
   el('portal-sched-loading').style.display='none';
-}
-
-function renderPortalDays(){
-  // Find this employee's row
-  const row=portalWeek?.rows?.find(r=>r.name===portalEmpName);
-  if(!row){el('portal-sched-content').style.display='none';el('portal-sched-empty').style.display='block';return;}
-  el('portal-sched-content').style.display='block';
-  const shiftBg={AM:'#f0faf8',PM:'#f5fbef',Overnight:'#eeebff',Mid:'#fff8ec',OFF:'#fff4f4',Paid:'#f5f0ff',Leave:'#f5f0ff','':'#f9f9fb'};
-  const shiftClr={AM:'#1a7a6a',PM:'#3a7a1a',Overnight:'#5c3aaa',Mid:'#a05a00',OFF:'var(--red)',Paid:'#5c3aaa',Leave:'#5c3aaa','':'var(--grey-400)'};
-  const taskClr={Calls:'#1a7a6a',Zendesk:'#3a7a1a',Emails:'var(--blue)','—':'var(--grey-400)'};
-  el('portal-days').innerHTML=DAYS.map(d=>{
-    const c=row.days[d]||{shift:'',start:'',end:'',task:'—'};
-    const bg=shiftBg[c.shift]||shiftBg[''];
-    const clr=shiftClr[c.shift]||shiftClr[''];
-    const tclr=taskClr[c.task]||taskClr['—'];
-    const dateStr=portalWeek.startDate?dayDate(portalWeek.startDate,d):'';
-    return `<div style="background:var(--white);border-radius:var(--r);box-shadow:var(--shadow);padding:1rem 1.25rem;display:flex;align-items:center;justify-content:space-between;gap:1rem">
-      <div>
-        <div style="font-weight:700;font-size:.9rem;color:var(--grey-900)">${d} <span style="font-weight:400;font-size:.78rem;color:var(--grey-400)">${dateStr}</span></div>
-        ${c.shift?`<div style="font-size:.78rem;color:var(--grey-400);margin-top:2px">${c.start&&c.end?c.start+' – '+c.end:''}</div>`:''}
-      </div>
-      <div style="display:flex;align-items:center;gap:.65rem">
-        <span style="background:${bg};color:${clr};font-weight:700;font-size:.78rem;padding:.28rem .75rem;border-radius:100px">${c.shift||'—'}</span>
-        ${c.shift&&c.shift!=='OFF'&&c.shift!=='Paid'&&c.shift!=='Leave'&&c.task&&c.task!=='—'?`<span style="color:${tclr};font-size:.78rem;font-weight:700;padding:.28rem .75rem;border-radius:100px;background:${tclr==='#1a7a6a'?'#e6f9f6':tclr==='#3a7a1a'?'#f0fae5':'var(--blue-light)'}">${c.task}</span>`:''}
-      </div>
-    </div>`;
-  }).join('');
 }
 
 // ── REQUEST WEEK ──
@@ -1774,7 +1774,7 @@ function pickDayPref(btn){
   const chipEl=el(`preq-chip-${day}`);
   if(prefEl){
     prefEl.textContent=val;
-    const clr=val==='AM'?'#1a7a6a':val==='PM'?'#3a7a1a':val==='Overnight'?'#5c3aaa':val==='Mid'?'#a05a00':'var(--grey-600)';
+    const clr=val==='AM'?'#1a7a6a':val==='PM'?'#3a7a1a':val==='Overnight'?'#888':val==='Mid'?'#a05a00':'var(--grey-600)';
     prefEl.style.color=clr;
     chipEl.style.borderColor=val==='Any'?'var(--grey-200)':'var(--primary)';
     chipEl.style.background=val==='Any'?'var(--grey-50)':'var(--primary-light)';
@@ -1819,7 +1819,7 @@ function buildPswDaysGrid(){
     const hasShift=c.shift&&c.shift!=='OFF'&&c.shift!=='Paid'&&c.shift!=='Leave';
     const bg=hasShift?'var(--white)':'var(--grey-50)';
     const bdr=hasShift?'var(--grey-200)':'var(--grey-100)';
-    const clr=c.shift==='AM'?'#1a7a6a':c.shift==='PM'?'#3a7a1a':c.shift==='Overnight'?'#5c3aaa':c.shift==='Mid'?'#a05a00':'var(--grey-400)';
+    const clr=c.shift==='AM'?'#1a7a6a':c.shift==='PM'?'#3a7a1a':c.shift==='Overnight'?'#888':c.shift==='Mid'?'#a05a00':'var(--grey-400)';
     return `<div data-swday="${d}" data-swshift="${c.shift||''}" data-swstart="${c.start||''}" data-swend="${c.end||''}"
       style="cursor:${hasShift?'pointer':'default'};background:${bg};border:1.5px solid ${bdr};border-radius:var(--r2);padding:.5rem .2rem;text-align:center;transition:all .14s;opacity:${hasShift?'1':'.45'}" id="psw-chip-${d}">
       <div style="font-size:.62rem;font-weight:700;color:var(--grey-400);text-transform:uppercase">${d.slice(0,3)}</div>
@@ -1837,20 +1837,35 @@ function buildPswDaysGrid(){
 
 function selectSwitchDay(day,shift,start,end){
   portalSwitchDay=day;
-  // Update chip highlights
   DAYS.forEach(d=>{
     const chip=el('psw-chip-'+d);
     if(chip){chip.style.borderColor=d===day?'var(--primary)':'var(--grey-200)';chip.style.background=d===day?'var(--primary-light)':'var(--white)';}
   });
   el('psw-info').style.display='block';
-  el('psw-day-label').textContent=day+' — switching from '+shift;
-  el('psw-shift-label').textContent=start&&end?'Your shift: '+start+' – '+end:'Shift: '+shift;
+  el('psw-day-label').textContent=day;
+  el('psw-shift-label').textContent='Your shift: '+(start&&end?start+' – '+end+' ('+shift+')':shift||'Not set');
+  updateColleagueShiftInfo();
+}
+
+function updateColleagueShiftInfo(){
+  const colleague=el('psw-colleague')?.value;
+  const infoEl=el('psw-colleague-shift');
+  if(!infoEl) return;
+  if(!colleague||!portalSwitchDay){infoEl.style.display='none';return;}
+  const colRow=portalWeek?.rows?.find(r=>r.name===colleague);
+  const colCell=colRow?.days[portalSwitchDay]||{};
+  const shiftTxt=colCell.shift?(colCell.start&&colCell.end?colCell.start+' – '+colCell.end+' ('+colCell.shift+')':colCell.shift):'No shift on this day';
+  infoEl.textContent=colleague+"'s shift: "+shiftTxt;
+  infoEl.style.display='block';
 }
 
 function buildColleagueList(){
   const sel=el('psw-colleague');
   sel.innerHTML='<option value="">— Select colleague —</option>'+
-    emps.filter(e=>e.name!==portalEmpName).map(e=>`<option value="${e.name}">${e.name}</option>`).join('');
+    emps.filter(e=>e.name!==portalEmpName)
+        .map(e=>`<option value="${e.name}">${e.name}</option>`)
+        .join('');
+  sel.onchange=updateColleagueShiftInfo;
 }
 
 async function submitPortalSwitch(){
@@ -1901,7 +1916,7 @@ async function loadEmpsForForm(){
   // Build pref grid
   el('fpref-grid').innerHTML=DAYS.map(d=>`<div>
     <label style="font-size:.62rem">${d}</label>
-    <select id="fp-${d}"><option>Any</option><option>AM</option><option>PM</option><option>Mid</option><option>Overnight</option></select>
+    <select id="fp-${d}"><option>Any</option><option>AM</option><option>PM</option><option>Mid</option></select>
   </div>`).join('');
 }
 
@@ -1991,7 +2006,7 @@ function renderSwitches(){
   if(!filtered.length){cards.innerHTML='';empty.style.display='block';return;}
   empty.style.display='none';
 
-  const shiftClr={AM:'var(--a2)',PM:'var(--ac)',Mid:'var(--a4)',Overnight:'var(--a5)'};
+  const shiftClr={AM:'var(--a2)',PM:'var(--ac)',Mid:'var(--a4)'};
   cards.innerHTML=filtered.map(sw=>{
     const scls=sw.status==='approved'?'sw-approved':sw.status==='rejected'?'sw-rejected':'';
     const stxt=sw.status==='approved'?'Approved':sw.status==='rejected'?'Rejected':'Pending';
