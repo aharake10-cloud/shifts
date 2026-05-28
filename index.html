@@ -623,6 +623,8 @@ details.card>summary::-webkit-details-marker{display:none;}
     <div id="ptab-sched-content">
       <div style="font-size:1.2rem;font-weight:800;color:var(--grey-900);margin-bottom:.35rem">My Schedule</div>
       <div style="font-size:.85rem;color:var(--grey-400);margin-bottom:1.25rem" id="portal-week-label">Current week</div>
+      <!-- Existing request summary shown here -->
+      <div id="portal-existing-req" style="display:none"></div>
       <div id="portal-sched-loading" style="padding:3rem;text-align:center"><div class="spinner"></div></div>
       <div id="portal-sched-content" style="display:none">
         <div id="portal-days" style="display:flex;flex-direction:column;gap:.65rem"></div>
@@ -1599,14 +1601,85 @@ let portalDayPrefs={};  // {Monday:'AM', Tuesday:'Any', ...}
 let portalSwitchDay=''; // selected day for switch request
 
 async function bootPortal(empName,uid){
-  portalEmpName=empName;portalUid=uid;
+  portalEmpName=empName; portalUid=uid;
   portalDayPrefs={};DAYS.forEach(d=>portalDayPrefs[d]='Any');
-  // Load employees for colleague list
-  try{const s=await fb.getDocs(fb.collection(db,'employees'));emps=[];s.forEach(d=>emps.push({id:d.id,...d.data()}));}catch(e){}
+  // Load only the 4 employees from Firestore (for colleague list)
+  try{
+    const s=await _db.collection('employees').get();
+    emps=[];s.forEach(d=>emps.push({id:d.id,...d.data()}));
+  }catch(e){}
   await loadPortalSchedule();
+  await loadPortalRequest(); // load existing request if any
   buildPreqDaysGrid();
   buildPswDaysGrid();
   buildColleagueList();
+  // Pre-fill name on request tab
+  el('preq-name').value=empName;
+}
+
+// ── LOAD EXISTING REQUEST ──
+let myExistingRequest=null;
+async function loadPortalRequest(){
+  try{
+    // Get all requests for this employee (no compound index needed)
+    const snap=await _db.collection('requests')
+      .where('employeeName','==',portalEmpName)
+      .get();
+    if(!snap.empty){
+      // Find the most recent one
+      const docs=[];snap.forEach(d=>docs.push({id:d.id,...d.data()}));
+      docs.sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+      myExistingRequest=docs[0];
+      renderMyRequest();
+    }
+  }catch(e){ console.log('Request load error:',e.message); }
+}
+
+function renderMyRequest(){
+  if(!myExistingRequest) return;
+  const r=myExistingRequest;
+  const statusClr=r.status==='approved'?'var(--success)':r.status==='rejected'?'var(--red)':'var(--amber)';
+  const statusTxt=r.status==='approved'?'✓ Approved':r.status==='rejected'?'✗ Rejected':'⏳ Pending review';
+
+  // Show a submitted request summary on the My Schedule tab
+  const existing=el('portal-existing-req');
+  if(existing){
+    existing.innerHTML=`
+      <div style="background:var(--white);border-radius:var(--r);box-shadow:var(--shadow);padding:1rem 1.25rem;margin-bottom:1rem;border-left:3px solid ${statusClr}">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem">
+          <div style="font-weight:700;font-size:.9rem">Your next week request</div>
+          <span style="font-size:.75rem;font-weight:700;color:${statusClr}">${statusTxt}</span>
+        </div>
+        <div style="font-size:.8rem;color:var(--grey-600)">Day off: <strong>${r.dayOff||'—'}</strong></div>
+        <div style="display:flex;flex-wrap:wrap;gap:.35rem;margin-top:.5rem">
+          ${DAYS.map(d=>{
+            const pref=d===r.dayOff?'OFF':(r.shiftPrefs?.[d]||'Any');
+            if(pref==='Any') return '';
+            const dst=r.dayStatuses?.[d]||'pending';
+            const bdr=dst==='approved'?'var(--success)':dst==='rejected'?'var(--red)':'var(--grey-200)';
+            return `<span style="font-size:.72rem;font-weight:600;padding:.2rem .55rem;border-radius:100px;border:1.5px solid ${bdr};color:var(--grey-900)">${d.slice(0,3)}: ${pref}</span>`;
+          }).filter(Boolean).join('')}
+        </div>
+        ${r.note?`<div style="font-size:.75rem;color:var(--grey-400);margin-top:.4rem;font-style:italic">"${r.note}"</div>`:''}
+      </div>`;
+    existing.style.display='block';
+  }
+
+  // Pre-fill the request form with existing values
+  if(r.dayOff) el('preq-dayoff').value=r.dayOff;
+  if(r.shiftPrefs){
+    DAYS.forEach(d=>{
+      const pref=r.shiftPrefs[d];
+      if(pref&&pref!=='Any'){
+        portalDayPrefs[d]=pref;
+        const p=el('preq-pref-'+d);
+        const ch=el('preq-chip-'+d);
+        if(p){p.textContent=pref;const clr=pref==='AM'?'#1a7a6a':pref==='PM'?'#3a7a1a':pref==='Overnight'?'#5c3aaa':pref==='Mid'?'#a05a00':'var(--grey-600)';p.style.color=clr;}
+        if(ch){ch.style.borderColor='var(--primary)';ch.style.background='var(--primary-light)';}
+      }
+    });
+  }
+  if(r.note) el('preq-note').value=r.note;
 }
 
 function switchPortalTab(tab){
@@ -1717,6 +1790,9 @@ async function submitPortalRequest(){
       createdAt:Date.now(),type:'week'
     });
     toast('✅ Request submitted!','ok');
+    // Reload and show the submitted request
+    await loadPortalRequest();
+    renderMyRequest();
     // Reset form fields but stay on same tab
     el('preq-dayoff').value='';el('preq-note').value='';
     DAYS.forEach(d=>{
