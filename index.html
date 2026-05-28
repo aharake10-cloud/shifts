@@ -1620,19 +1620,26 @@ async function bootPortal(empName,uid){
 // ── LOAD EXISTING REQUEST ──
 let myExistingRequest=null;
 async function loadPortalRequest(){
+  myExistingRequest=null;
   try{
-    // Get all requests for this employee (no compound index needed)
+    // Simple query — no composite index needed
     const snap=await _db.collection('requests')
       .where('employeeName','==',portalEmpName)
       .get();
     if(!snap.empty){
-      // Find the most recent one
-      const docs=[];snap.forEach(d=>docs.push({id:d.id,...d.data()}));
+      const docs=[];
+      snap.forEach(d=>docs.push({id:d.id,...d.data()}));
+      // Sort client-side to avoid needing Firestore index
       docs.sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
       myExistingRequest=docs[0];
+      console.log('Found request for',portalEmpName,':',myExistingRequest.status);
       renderMyRequest();
+    } else {
+      console.log('No requests found for',portalEmpName);
     }
-  }catch(e){ console.log('Request load error:',e.message); }
+  }catch(e){
+    console.error('loadPortalRequest error:',e.message);
+  }
 }
 
 function renderMyRequest(){
