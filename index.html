@@ -1684,15 +1684,65 @@ async function loadWeeksForPortal(){
     const snap=await _db.collection('weeks').get();
     availableWeeks=[];
     snap.forEach(d=>availableWeeks.push({id:d.id,...d.data()}));
-    availableWeeks.sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+    availableWeeks.sort((a,b)=>(a.createdAt||0)-(b.createdAt||0)); // oldest first
+
+    const today=new Date(); today.setHours(0,0,0,0);
     const sel=el('preq-week');
     if(!sel) return;
-    sel.innerHTML='<option value="">— Select a week —</option>'+
-      availableWeeks.map(w=>{
-        const range=w.startDate&&w.endDate?' ('+fmtDate(w.startDate)+' – '+fmtDate(w.endDate)+')':'';
-        return '<option value="'+w.id+'">'+w.label+range+'</option>';
-      }).join('');
-    sel.onchange=onWeekSelected;
+
+    // Detect current week (published, dates include today)
+    let currentWeek=null;
+    for(const w of availableWeeks){
+      if(!w.startDate||!w.endDate) continue;
+      const s=new Date(w.startDate); s.setHours(0,0,0,0);
+      const e=new Date(w.endDate);   e.setHours(23,59,59,999);
+      if(today>=s && today<=e){ currentWeek=w; break; }
+    }
+
+    // Requestable = weeks that START after today (future weeks)
+    // Also include weeks with no dates set (manager created without dates)
+    const requestable=availableWeeks.filter(w=>{
+      if(!w.startDate) return true; // no date = always requestable
+      const s=new Date(w.startDate); s.setHours(0,0,0,0);
+      return s>today; // only future weeks
+    });
+
+    // Update the week info banner on the sched tab
+    const wlabel=el('portal-week-label');
+    if(wlabel&&currentWeek){
+      const range=currentWeek.startDate&&currentWeek.endDate
+        ?' · '+fmtDate(currentWeek.startDate)+' – '+fmtDate(currentWeek.endDate):'';
+      wlabel.textContent=currentWeek.label+range+' (current week)';
+    }
+
+    if(requestable.length===0){
+      sel.innerHTML='<option value="">No upcoming weeks available yet</option>';
+      sel.disabled=true;
+      // Show info message
+      const info=el('preq-week-info');
+      if(info){
+        info.textContent='⏳ Your manager hasn\'t created next week\'s schedule yet. Check back soon.';
+        info.style.display='block';
+        info.style.background='var(--amber-light)';
+        info.style.color='var(--amber)';
+      }
+    } else {
+      sel.disabled=false;
+      sel.innerHTML='<option value="">— Select a week —</option>'+
+        requestable.map(w=>{
+          const range=w.startDate&&w.endDate
+            ?' ('+fmtDate(w.startDate)+' – '+fmtDate(w.endDate)+')':'';
+          const alreadyReq=myRequests[w.id]?'  ✓':'';
+          return '<option value="'+w.id+'">'+w.label+range+alreadyReq+'</option>';
+        }).join('');
+      sel.onchange=onWeekSelected;
+
+      // Auto-select if only one option
+      if(requestable.length===1){
+        sel.value=requestable[0].id;
+        onWeekSelected();
+      }
+    }
   }catch(e){ console.error('loadWeeksForPortal:',e.message); }
 }
 
@@ -1750,51 +1800,35 @@ function renderMyRequest(){
   const existing=el('portal-existing-req');
   if(!existing) return;
 
-  // Only show if a REAL request exists with a dayOff set
-  if(!myExistingRequest || !myExistingRequest.dayOff){
-    existing.style.display='none';
-    return;
-  }
+  // Get all requests sorted newest first
+  const allReqs=Object.values(myRequests)
+    .filter(r=>r.dayOff) // only real ones
+    .sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
 
-  const r=myExistingRequest;
-  const statusClr=r.status==='approved'?'var(--success)':r.status==='rejected'?'var(--red)':'var(--amber)';
-  const statusTxt=r.status==='approved'?'✓ Approved':r.status==='rejected'?'✗ Rejected':'⏳ Pending review';
+  if(!allReqs.length){ existing.style.display='none'; return; }
 
-  existing.innerHTML=`
-    <div style="background:var(--white);border-radius:var(--r);box-shadow:var(--shadow);padding:1rem 1.25rem;margin-bottom:1rem;border-left:3px solid ${statusClr}">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem">
-        <div style="font-weight:700;font-size:.9rem">Your next week request</div>
+  existing.innerHTML=allReqs.map(r=>{
+    const statusClr=r.status==='approved'?'var(--success)':r.status==='rejected'?'var(--red)':'var(--amber)';
+    const statusTxt=r.status==='approved'?'✓ Approved':r.status==='rejected'?'✗ Rejected':'⏳ Pending';
+    return `<div style="background:var(--white);border-radius:var(--r);box-shadow:var(--shadow);padding:1rem 1.25rem;margin-bottom:.65rem;border-left:3px solid ${statusClr}">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem">
+        <div style="font-weight:700;font-size:.9rem">${r.weekLabel||'Request'}</div>
         <span style="font-size:.75rem;font-weight:700;color:${statusClr}">${statusTxt}</span>
       </div>
       <div style="font-size:.8rem;color:var(--grey-600)">Day off: <strong>${r.dayOff}</strong></div>
-      <div style="display:flex;flex-wrap:wrap;gap:.35rem;margin-top:.5rem">
+      <div style="display:flex;flex-wrap:wrap;gap:.35rem;margin-top:.4rem">
         ${DAYS.map(d=>{
           const pref=d===r.dayOff?'OFF':(r.shiftPrefs?.[d]||'Any');
           if(pref==='Any') return '';
           const dst=d===r.dayOff?(r.dayOffStatus||'pending'):(r.dayStatuses?.[d]||'pending');
           const bdr=dst==='approved'?'var(--success)':dst==='rejected'?'var(--red)':'var(--grey-200)';
-          return `<span style="font-size:.72rem;font-weight:600;padding:.2rem .55rem;border-radius:100px;border:1.5px solid ${bdr};color:var(--grey-900)">${d.slice(0,3)}: ${pref}</span>`;
+          return '<span style="font-size:.72rem;font-weight:600;padding:.2rem .55rem;border-radius:100px;border:1.5px solid '+bdr+';color:var(--grey-900)">'+d.slice(0,3)+': '+pref+'</span>';
         }).filter(Boolean).join('')}
       </div>
-      ${r.note?`<div style="font-size:.75rem;color:var(--grey-400);margin-top:.4rem;font-style:italic">"${r.note}"</div>`:''}
+      ${r.note?`<div style="font-size:.75rem;color:var(--grey-400);margin-top:.35rem;font-style:italic">"${r.note}"</div>`:''}
     </div>`;
+  }).join('');
   existing.style.display='block';
-
-  // Pre-fill request form with saved values
-  if(r.dayOff) el('preq-dayoff').value=r.dayOff;
-  if(r.shiftPrefs){
-    DAYS.forEach(d=>{
-      const pref=r.shiftPrefs[d];
-      if(pref&&pref!=='Any'){
-        portalDayPrefs[d]=pref;
-        const p=el('preq-pref-'+d);
-        const ch=el('preq-chip-'+d);
-        if(p){p.textContent=pref;const clr=pref==='AM'?'#1a7a6a':pref==='PM'?'#3a7a1a':pref==='Overnight'?'#888':pref==='Mid'?'#a05a00':'var(--grey-600)';p.style.color=clr;}
-        if(ch){ch.style.borderColor='var(--primary)';ch.style.background='var(--primary-light)';}
-      }
-    });
-  }
-  if(r.note) el('preq-note').value=r.note;
 }
 
 function renderPortalDays(){
