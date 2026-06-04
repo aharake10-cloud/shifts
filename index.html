@@ -421,6 +421,8 @@ details.card>summary::-webkit-details-marker{display:none;}
           <button class="btn btn-white btn-sm" id="btn-new-week">+ New week</button>
           <button class="btn btn-white btn-sm" id="btn-assign">⚡ Assign tasks</button>
           <button class="btn btn-green btn-sm" id="btn-publish">🚀 Publish</button>
+          <button class="btn btn-white btn-sm" id="btn-clear-tasks" style="color:var(--amber);border-color:var(--amber)" title="Clear all task assignments but keep shifts">🗑 Clear tasks</button>
+          <button class="btn btn-danger btn-sm" id="btn-delete-week">✕ Delete week</button>
         </div>
       </div>
       <div id="build-wbar"></div>
@@ -629,10 +631,24 @@ details.card>summary::-webkit-details-marker{display:none;}
     </div>
     <!-- REQUEST WEEK -->
     <div id="ptab-req-content" style="display:none">
-      <div style="font-size:1.2rem;font-weight:800;color:var(--grey-900);margin-bottom:.35rem">Request Next Week</div>
-      <div style="font-size:.85rem;color:var(--grey-400);margin-bottom:1.25rem">Your name is pre-filled. Select your day off and shift preferences.</div>
+      <div style="font-size:1.2rem;font-weight:800;color:var(--grey-900);margin-bottom:.35rem">Request Schedule</div>
+      <div style="font-size:.85rem;color:var(--grey-400);margin-bottom:1.25rem">Select which week you're requesting for, your day off and shift preferences.</div>
       <div class="card">
         <div class="frow"><label>Your Name</label><input type="text" id="preq-name" readonly style="background:var(--grey-50);font-weight:600"></div>
+
+        <!-- Week selector -->
+        <div class="frow">
+          <label>Which Week?</label>
+          <select id="preq-week">
+            <option value="">— Select a week —</option>
+          </select>
+        </div>
+        <!-- Week date range display -->
+        <div id="preq-week-info" style="display:none;background:var(--grey-50);border-radius:var(--r2);padding:.5rem .85rem;margin-top:-.5rem;margin-bottom:.75rem;font-size:.82rem;color:var(--grey-600);font-weight:600"></div>
+
+        <!-- Existing request for selected week -->
+        <div id="preq-existing" style="display:none;margin-bottom:.75rem"></div>
+
         <div class="frow"><label>Requested Day Off</label>
           <select id="preq-dayoff"><option value="">— Pick a day —</option>
             <option>Monday</option><option>Tuesday</option><option>Wednesday</option>
@@ -1248,6 +1264,34 @@ async function clearCell(){
 // ══════════════════════════════════════
 // TASK ASSIGNMENT
 // ══════════════════════════════════════
+async function deleteWeek(){
+  const week=getWeek(buildWid);
+  if(!week){toast('No active week to delete','err');return;}
+  if(!confirm(`Delete "${week.label}" permanently? This cannot be undone.`))return;
+  try{
+    await _db.collection('weeks').doc(week.id).delete();
+    weeks=weeks.filter(w=>w.id!==week.id);
+    buildWid=weeks.length?weeks[0].id:null;
+    renderWeekBars();
+    renderBuild();
+    toast(`"${week.label}" deleted`,'ok');
+  }catch(e){toast('Error: '+e.message,'err');}
+}
+
+async function clearWeekTasks(){
+  const week=getWeek(buildWid);
+  if(!week){toast('No active week','err');return;}
+  if(!confirm(`Clear all task assignments in "${week.label}"? Shifts will be kept.`))return;
+  try{
+    week.rows.forEach(row=>{
+      DAYS.forEach(d=>{if(row.days[d]) row.days[d].task='—';});
+    });
+    await _db.collection('weeks').doc(week.id).update({rows:JSON.stringify(week.rows)});
+    renderBuild();
+    toast('Tasks cleared','ok');
+  }catch(e){toast('Error: '+e.message,'err');}
+}
+
 async function assignTasksAndSave(){
   const week=getWeek(buildWid);if(!week){toast('No draft week','err');return;}
   const btn=el('btn-assign');btn.disabled=true;btn.textContent='⏳…';
@@ -1605,7 +1649,8 @@ async function bootPortal(empName,uid){
     emps=[];s.forEach(d=>emps.push({id:d.id,...d.data()}));
   }catch(e){}
   await loadPortalSchedule();
-  await loadPortalRequest(); // load existing request if any
+  await loadPortalRequest();
+  await loadWeeksForPortal(); // load weeks for the request selector
   buildPreqDaysGrid();
   buildPswDaysGrid();
   buildColleagueList();
@@ -1613,28 +1658,91 @@ async function bootPortal(empName,uid){
   el('preq-name').value=empName;
 }
 
-// ── LOAD EXISTING REQUEST ──
+// ── LOAD ALL REQUESTS FOR THIS EMPLOYEE (keyed by weekId) ──
 let myExistingRequest=null;
+let myRequests={};
+let availableWeeks=[];
+
 async function loadPortalRequest(){
-  myExistingRequest=null;
+  myExistingRequest=null; myRequests={};
   try{
-    // Simple query — no composite index needed
-    const snap=await _db.collection('requests')
-      .where('employeeName','==',portalEmpName)
-      .get();
-    if(!snap.empty){
-      const docs=[];
-      snap.forEach(d=>docs.push({id:d.id,...d.data()}));
-      // Sort client-side to avoid needing Firestore index
-      docs.sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
-      myExistingRequest=docs[0];
-      console.log('Found request for',portalEmpName,':',myExistingRequest.status);
-      renderMyRequest();
-    } else {
-      console.log('No requests found for',portalEmpName);
+    const snap=await _db.collection('requests').where('employeeName','==',portalEmpName).get();
+    snap.forEach(d=>{
+      const data={id:d.id,...d.data()};
+      const key=data.weekId||'default';
+      if(!myRequests[key]||(data.updatedAt||data.createdAt||0)>(myRequests[key].updatedAt||myRequests[key].createdAt||0))
+        myRequests[key]=data;
+    });
+    const all=Object.values(myRequests).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+    if(all.length) myExistingRequest=all[0];
+    renderMyRequest();
+  }catch(e){ console.error('loadPortalRequest:',e.message); }
+}
+
+async function loadWeeksForPortal(){
+  try{
+    const snap=await _db.collection('weeks').get();
+    availableWeeks=[];
+    snap.forEach(d=>availableWeeks.push({id:d.id,...d.data()}));
+    availableWeeks.sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+    const sel=el('preq-week');
+    if(!sel) return;
+    sel.innerHTML='<option value="">— Select a week —</option>'+
+      availableWeeks.map(w=>{
+        const range=w.startDate&&w.endDate?' ('+fmtDate(w.startDate)+' – '+fmtDate(w.endDate)+')':'';
+        return '<option value="'+w.id+'">'+w.label+range+'</option>';
+      }).join('');
+    sel.onchange=onWeekSelected;
+  }catch(e){ console.error('loadWeeksForPortal:',e.message); }
+}
+
+function onWeekSelected(){
+  const wid=el('preq-week').value;
+  const infoEl=el('preq-week-info');
+  const existingEl=el('preq-existing');
+  if(!wid){infoEl.style.display='none';existingEl.style.display='none';return;}
+  const week=availableWeeks.find(w=>w.id===wid);
+  if(week){
+    const range=week.startDate&&week.endDate?week.startDate+' – '+week.endDate:'';
+    infoEl.textContent='📅 '+week.label+(range?' · '+fmtDate(week.startDate)+' – '+fmtDate(week.endDate):'');
+    infoEl.style.display='block';
+  }
+  // Reset form fields
+  el('preq-dayoff').value='';el('preq-note').value='';
+  DAYS.forEach(d=>{
+    portalDayPrefs[d]='Any';
+    const p=el('preq-pref-'+d);const ch=el('preq-chip-'+d);
+    if(p){p.textContent='Any';p.style.color='var(--grey-600)';}
+    if(ch){ch.style.borderColor='var(--grey-200)';ch.style.background='var(--grey-50)';}
+  });
+  const existing=myRequests[wid];
+  if(existing&&existing.dayOff){
+    const sc=existing.status==='approved'?'var(--success)':existing.status==='rejected'?'var(--red)':'var(--amber)';
+    const st=existing.status==='approved'?'✓ Approved':existing.status==='rejected'?'✗ Rejected':'⏳ Pending';
+    existingEl.innerHTML='<div style="background:var(--grey-50);border:1.5px solid var(--grey-200);border-radius:var(--r2);padding:.65rem .9rem;font-size:.8rem;margin-bottom:.5rem">'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.25rem">'
+      +'<span style="font-weight:700;color:var(--grey-900)">Already submitted</span>'
+      +'<span style="font-weight:700;color:'+sc+'">'+st+'</span></div>'
+      +'<div style="color:var(--grey-600)">Day off: <strong>'+existing.dayOff+'</strong></div>'
+      +'<div style="font-size:.72rem;color:var(--grey-400);margin-top:.2rem">Submitting again will update your request.</div></div>';
+    existingEl.style.display='block';
+    // Pre-fill with existing values
+    el('preq-dayoff').value=existing.dayOff||'';
+    el('preq-note').value=existing.note||'';
+    if(existing.shiftPrefs){
+      DAYS.forEach(d=>{
+        const pref=existing.shiftPrefs[d];
+        if(pref&&pref!=='Any'){
+          portalDayPrefs[d]=pref;
+          const p=el('preq-pref-'+d);const ch=el('preq-chip-'+d);
+          const clr=pref==='AM'?'#1a7a6a':pref==='PM'?'#3a7a1a':pref==='Mid'?'#a05a00':'var(--grey-600)';
+          if(p){p.textContent=pref;p.style.color=clr;}
+          if(ch){ch.style.borderColor='var(--primary)';ch.style.background='var(--primary-light)';}
+        }
+      });
     }
-  }catch(e){
-    console.error('loadPortalRequest error:',e.message);
+  } else {
+    existingEl.style.display='none';
   }
 }
 
@@ -1784,29 +1892,37 @@ function pickDayPref(btn){
 
 async function submitPortalRequest(){
   const name=portalEmpName;
+  const wid=el('preq-week').value;
   const dayOff=el('preq-dayoff').value;
   const err=el('preq-err');err.style.display='none';
+  if(!wid){err.textContent='Please select a week first.';err.style.display='block';return;}
   if(!dayOff){err.textContent='Please select your day off.';err.style.display='block';return;}
-  const btn=document.querySelector('#ptab-req-content .btn-green');
+  const btn=el('btn-portal-req');
   btn.disabled=true;btn.textContent='Submitting…';
+  const week=availableWeeks.find(w=>w.id===wid);
+  const weekLabel=week?.label||'';
   try{
-    await fb.addDoc(fb.collection(db,'requests'),{
-      employeeName:name,dayOff,shiftPrefs:{...portalDayPrefs},
+    const data={
+      employeeName:name,weekId:wid,weekLabel,
+      dayOff,shiftPrefs:{...portalDayPrefs},
       note:el('preq-note').value.trim(),
       status:'pending',dayOffStatus:'pending',dayStatuses:{},
-      createdAt:Date.now(),type:'week'
-    });
-    toast('✅ Request submitted!','ok');
-    // Reload and show the submitted request
-    await loadPortalRequest();
+      updatedAt:Date.now(),type:'week'
+    };
+    const existing=myRequests[wid];
+    if(existing){
+      await _db.collection('requests').doc(existing.id).update(data);
+      myRequests[wid]={...existing,...data};
+      toast('✅ Request updated for '+weekLabel+'!','ok');
+    } else {
+      data.createdAt=Date.now();
+      const ref=await _db.collection('requests').add(data);
+      myRequests[wid]={id:ref.id,...data};
+      toast('✅ Request submitted for '+weekLabel+'!','ok');
+    }
+    myExistingRequest=myRequests[wid];
     renderMyRequest();
-    // Reset form fields but stay on same tab
-    el('preq-dayoff').value='';el('preq-note').value='';
-    DAYS.forEach(d=>{
-      portalDayPrefs[d]='Any';
-      const p=el('preq-pref-'+d);if(p){p.textContent='Any';p.style.color='var(--grey-600)';}
-      const ch=el('preq-chip-'+d);if(ch){ch.style.borderColor='var(--grey-200)';ch.style.background='var(--grey-50)';}
-    });
+    onWeekSelected(); // refresh existing badge
   }catch(e){err.textContent='Error: '+e.message;err.style.display='block';}
   btn.disabled=false;btn.textContent='Submit request';
 }
@@ -2104,6 +2220,7 @@ window.submitForm=submitForm; window.submitSwitchForm=submitSwitchForm;
 window.switchFormType=switchFormType; window.switchPortalTab=switchPortalTab;
 window.openDayPrefModal=openDayPrefModal; window.pickDayPref=pickDayPref;
 window.submitPortalRequest=submitPortalRequest; window.selectSwitchDay=selectSwitchDay;
+window.deleteWeek=deleteWeek; window.clearWeekTasks=clearWeekTasks;
 window.submitPortalSwitch=submitPortalSwitch; window.pickType=pickType;
 
 // ══════════════════════════════════════
@@ -2131,6 +2248,8 @@ wire('vt-times',         ()=>setView('times'));
 wire('vt-tasks',         ()=>setView('tasks'));
 wire('btn-new-week',     openNewWeekModal);
 wire('btn-assign',       assignTasksAndSave);
+wire('btn-delete-week',  deleteWeek);
+wire('btn-clear-tasks',  clearWeekTasks);
 wire('btn-publish',      publishWeek);
 wire('btn-create-week',  createWeek);
 wire('btn-copy-form',    copyFormLink);
