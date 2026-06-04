@@ -853,6 +853,53 @@ async function boot(){
   renderWeekBars();
   renderSchedule();
   renderBuild();
+  // ── Real-time listeners ──
+  startRealtimeListeners();
+}
+
+function startRealtimeListeners(){
+  // Listen for new/updated requests
+  _db.collection('requests').onSnapshot(snap=>{
+    snap.docChanges().forEach(change=>{
+      if(change.type==='added'||change.type==='modified'){
+        const data={id:change.doc.id,...change.doc.data()};
+        const idx=allReqs.findIndex(r=>r.id===data.id);
+        if(idx>=0) allReqs[idx]=data;
+        else allReqs.unshift(data);
+      }
+      if(change.type==='removed'){
+        allReqs=allReqs.filter(r=>r.id!==change.doc.id);
+      }
+    });
+    buildApprovedMap();
+    detectConflicts();
+    updateBadge();
+    // Re-render if on requests page
+    if(el('page-requests').classList.contains('active')) renderReqs();
+    // Flash badge to draw attention
+    const badge=el('req-badge');
+    if(badge&&badge.style.display!=='none'){
+      badge.style.transform='scale(1.3)';
+      setTimeout(()=>badge.style.transform='',300);
+    }
+  });
+
+  // Listen for new/updated switch requests
+  _db.collection('switches').onSnapshot(snap=>{
+    snap.docChanges().forEach(change=>{
+      const data={id:change.doc.id,...change.doc.data()};
+      if(change.type==='added'||change.type==='modified'){
+        const idx=allSwitches.findIndex(s=>s.id===data.id);
+        if(idx>=0) allSwitches[idx]=data;
+        else allSwitches.unshift(data);
+      }
+      if(change.type==='removed'){
+        allSwitches=allSwitches.filter(s=>s.id!==change.doc.id);
+      }
+    });
+    updateSwBadge();
+    if(el('page-requests').classList.contains('active')&&activeReqTab==='switch') renderSwitches();
+  });
 }
 
 // ══════════════════════════════════════
@@ -1833,29 +1880,93 @@ function renderMyRequest(){
 
 function renderPortalDays(){
   const row=portalWeek?.rows?.find(r=>r.name===portalEmpName);
-  // Show schedule section regardless — empty days = no shift assigned yet
   el('portal-sched-content').style.display='block';
   el('portal-sched-empty').style.display='none';
-  const shiftBg={AM:'#f0faf8',PM:'#f5fbef',Mid:'#fff8ec',OFF:'#fff4f4',Paid:'#f5f0ff',Leave:'#f5f0ff','':'#f9f9fb'};
-  const shiftClr={AM:'#1a7a6a',PM:'#3a7a1a',Mid:'#a05a00',OFF:'var(--red)',Paid:'#5c3aaa',Leave:'#5c3aaa','':'var(--grey-400)'};
-  const taskClr={Calls:'#1a7a6a',Zendesk:'#3a7a1a',Emails:'var(--blue)','—':'var(--grey-400)'};
-  el('portal-days').innerHTML=DAYS.map(d=>{
+
+  const today=new Date();today.setHours(0,0,0,0);
+
+  // Build exactly the same table as admin but for just this employee
+  const wrap=el('portal-days');
+  wrap.innerHTML='';
+
+  const outerDiv=document.createElement('div');
+  outerDiv.className='sched-outer';
+  const tbl=document.createElement('table');
+  tbl.className='sched-tbl';
+
+  // Header — days as columns
+  const thead=tbl.createTHead();
+  const hr=thead.insertRow();
+  const th0=document.createElement('th');
+  th0.className='name-th';th0.textContent='My Schedule';
+  hr.appendChild(th0);
+  DAYS.forEach(d=>{
+    const th=document.createElement('th');
+    th.className='day-th';
+    const ds=portalWeek?.startDate?` <span style="font-size:.56rem;font-weight:400;color:var(--grey-400)">${dayDate(portalWeek.startDate,d)}</span>`:'';
+    // Highlight today
+    let isToday=false;
+    if(portalWeek?.startDate){
+      const dd=new Date(portalWeek.startDate);
+      dd.setDate(dd.getDate()+DAYS.indexOf(d));
+      dd.setHours(0,0,0,0);
+      isToday=dd.getTime()===today.getTime();
+    }
+    th.innerHTML=d.slice(0,3)+ds+(isToday?'<br><span style="font-size:.55rem;font-weight:700;color:var(--primary);background:rgba(240,35,60,.1);padding:.08rem .35rem;border-radius:100px">today</span>':'');
+    if(isToday) th.style.background='rgba(240,35,60,.04)';
+    hr.appendChild(th);
+  });
+
+  // Single row — this employee
+  const tbody=tbl.createTBody();
+  const tr=tbody.insertRow();
+
+  // Name cell
+  const td0=tr.insertCell();
+  td0.className='name-td';
+  td0.innerHTML=portalEmpName;
+
+  // Day cells — identical to admin table
+  DAYS.forEach(d=>{
     const c=row?.days[d]||{shift:'',start:'',end:'',task:'—'};
-    const bg=shiftBg[c.shift]||shiftBg[''];
-    const clr=shiftClr[c.shift]||shiftClr[''];
-    const tclr=taskClr[c.task]||taskClr['—'];
-    const dateStr=portalWeek?.startDate?dayDate(portalWeek.startDate,d):'';
-    return `<div style="background:var(--white);border-radius:var(--r);box-shadow:var(--shadow);padding:1rem 1.25rem;display:flex;align-items:center;justify-content:space-between;gap:1rem">
-      <div>
-        <div style="font-weight:700;font-size:.9rem;color:var(--grey-900)">${d} <span style="font-weight:400;font-size:.78rem;color:var(--grey-400)">${dateStr}</span></div>
-        ${c.shift?`<div style="font-size:.78rem;color:var(--grey-400);margin-top:2px">${c.start&&c.end?c.start+' – '+c.end:''}</div>`:''}
-      </div>
-      <div style="display:flex;align-items:center;gap:.65rem">
-        <span style="background:${bg};color:${clr};font-weight:700;font-size:.78rem;padding:.28rem .75rem;border-radius:100px">${c.shift||'Not set'}</span>
-        ${c.shift&&c.shift!=='OFF'&&c.shift!=='Paid'&&c.shift!=='Leave'&&c.task&&c.task!=='—'?`<span style="color:${tclr};font-size:.78rem;font-weight:700;padding:.28rem .75rem;border-radius:100px;background:${tclr==='#1a7a6a'?'#e6f9f6':tclr==='#3a7a1a'?'#f0fae5':'var(--blue-light)'}">${c.task}</span>`:''}
-      </div>
-    </div>`;
-  }).join('');
+    const td=tr.insertCell();
+
+    // Today highlight
+    let isToday=false;
+    if(portalWeek?.startDate){
+      const dd=new Date(portalWeek.startDate);
+      dd.setDate(dd.getDate()+DAYS.indexOf(d));
+      dd.setHours(0,0,0,0);
+      isToday=dd.getTime()===today.getTime();
+    }
+
+    const div=document.createElement('div');
+    const bg=SHIFT_BG[c.shift]||'c-empty';
+    div.className=`cell ${bg}`;
+    if(isToday) td.style.background='rgba(240,35,60,.03)';
+
+    const lc=SHIFT_LC[c.shift]||'';
+    const shift=c.shift||'';
+    const timeStr=c.start&&c.end?`${c.start}–${c.end}`:'';
+    const isOff=shift==='OFF'||shift==='Paid'||shift==='Leave';
+    const tlc=TASK_LC[c.task]||'';
+
+    div.innerHTML=`<span class="c-shift ${lc}">${shift||'—'}</span>
+      ${timeStr?`<span class="c-times">${timeStr}</span>`:''}
+      ${!isOff&&c.task&&c.task!=='—'?`<span class="c-task ${tlc}">${c.task}</span>`:''}
+      ${c.note?`<span class="c-note">${c.note}</span>`:''}`;
+
+    td.appendChild(div);
+  });
+
+  outerDiv.appendChild(tbl);
+  wrap.appendChild(outerDiv);
+
+  // Legend
+  const legend=document.createElement('div');
+  legend.style.cssText='display:flex;gap:.75rem;flex-wrap:wrap;margin-top:.75rem;font-size:.72rem;font-weight:600;align-items:center;color:var(--grey-400)';
+  legend.innerHTML=`<span style="color:#1a7a6a">● AM</span><span style="color:#3a7a1a">● PM</span><span style="color:#a05a00">● Mid</span><span style="color:var(--red)">● OFF</span><span style="color:#1a7a6a">● Calls</span><span style="color:#3a7a1a">● Zendesk</span><span style="color:#2563eb">● Emails</span>`;
+  wrap.appendChild(legend);
 }
 
 function switchPortalTab(tab){
@@ -2255,6 +2366,7 @@ window.switchFormType=switchFormType; window.switchPortalTab=switchPortalTab;
 window.openDayPrefModal=openDayPrefModal; window.pickDayPref=pickDayPref;
 window.submitPortalRequest=submitPortalRequest; window.selectSwitchDay=selectSwitchDay;
 window.deleteWeek=deleteWeek; window.clearWeekTasks=clearWeekTasks;
+window.startRealtimeListeners=startRealtimeListeners;
 window.submitPortalSwitch=submitPortalSwitch; window.pickType=pickType;
 
 // ══════════════════════════════════════
