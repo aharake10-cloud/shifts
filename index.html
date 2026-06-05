@@ -243,10 +243,11 @@ select option{background:var(--white);}
 .check-chip.on{border-color:var(--primary);background:rgba(240,35,60,.07);color:var(--primary);font-weight:700;}
 
 /* ─── REQUEST CARDS ─── */
-.req-card{background:var(--white);border-radius:var(--r);box-shadow:var(--shadow);padding:1.1rem 1.25rem;transition:box-shadow .15s;}
+.req-card{background:var(--white);border-radius:var(--r);box-shadow:var(--shadow);padding:1.1rem 1.25rem;transition:box-shadow .15s;border-left:3px solid transparent;}
 .req-card:hover{box-shadow:var(--shadow-md);}
-.req-card.has-conflict{border-left:3px solid var(--red);}
-.req-card.all-approved{border-left:3px solid var(--success);}
+.req-card.has-conflict{border-left:4px solid var(--red);background:rgba(214,58,58,.04);box-shadow:0 0 0 1px rgba(214,58,58,.15),0 2px 8px rgba(214,58,58,.08);}
+.req-card.all-approved{border-left:4px solid var(--success);}
+.req-card.has-conflict .req-name{color:var(--red);}
 .req-hdr{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;flex-wrap:wrap;margin-bottom:.8rem;}
 .req-name{font-weight:700;font-size:.95rem;color:var(--grey-900);}
 .req-meta{font-size:.72rem;color:var(--grey-400);margin-top:2px;}
@@ -265,7 +266,7 @@ select option{background:var(--white);}
 .sp-approved{background:var(--success-light);color:var(--success);}
 .sp-partial{background:var(--amber-light);color:var(--amber);}
 .sp-rejected{background:var(--red-light);color:var(--red);}
-.sp-conflict{background:var(--red-light);color:var(--red);border:1.5px solid var(--red);}
+.sp-conflict{background:var(--red);color:#fff;border:1.5px solid var(--red);font-weight:700;}
 .req-note{font-size:.8rem;color:var(--grey-600);font-style:italic;margin-top:.5rem;padding-top:.5rem;border-top:1px solid var(--grey-100);}
 .filter-row{display:flex;gap:.4rem;flex-wrap:wrap;align-items:center;margin-bottom:1rem;}
 .fbtn{padding:.3rem .8rem;border-radius:100px;background:var(--white);border:1.5px solid var(--grey-200);color:var(--grey-600);cursor:pointer;font-size:.75rem;font-weight:600;transition:all .14s;}
@@ -327,8 +328,8 @@ tbody td{padding:.65rem .9rem;vertical-align:middle;}
 .g2{display:grid;grid-template-columns:1fr 1fr;gap:1rem;}
 .pg{display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:.8rem;}
 /* conflict banner */
-.conflict-banner{background:var(--red-light);border-left:3px solid var(--red);border-radius:var(--r2);padding:.85rem 1rem;margin-bottom:1rem;}
-.conflict-banner-title{font-weight:700;color:var(--red);font-size:.875rem;margin-bottom:.35rem;}
+.conflict-banner{background:var(--red-light);border-left:4px solid var(--red);border-radius:var(--r2);padding:.85rem 1rem;margin-bottom:1rem;box-shadow:0 2px 8px rgba(214,58,58,.1);}
+.conflict-banner-title{font-weight:800;color:var(--red);font-size:.9rem;margin-bottom:.35rem;}
 .hint-box{background:rgba(240,35,60,.06);border:1.5px solid rgba(240,35,60,.2);border-radius:var(--r2);padding:.5rem .8rem;margin-bottom:1rem;font-size:.78rem;color:var(--primary);font-weight:500;}
 /* params details */
 details.card>summary{cursor:pointer;font-weight:700;font-size:.875rem;color:var(--grey-900);list-style:none;display:flex;align-items:center;gap:.5rem;}
@@ -1531,27 +1532,25 @@ async function loadRequests(){
 function detectConflicts(){
   const conflicts=[];
 
-  // ── 1. Day-off conflicts: 3+ people want the same day off ──
+  // ── 1. Day-off: only 1 person allowed per day ──
   const dayOffMap={};DAYS.forEach(d=>dayOffMap[d]=[]);
   allReqs.forEach(r=>{
     if((r.dayOffStatus||'pending')!=='rejected'&&r.dayOff)
       dayOffMap[r.dayOff].push(r.employeeName);
   });
   DAYS.forEach(d=>{
-    if(dayOffMap[d].length>=3)
-      conflicts.push(`<strong>${d} — Day Off:</strong> ${dayOffMap[d].length} people requested off — ${dayOffMap[d].slice(0,4).join(', ')}${dayOffMap[d].length>4?'…':''}`);
+    if(dayOffMap[d].length>=2)
+      conflicts.push(`<strong>${d} — Day Off:</strong> ${dayOffMap[d].length} people requested off — ${dayOffMap[d].join(', ')} (only 1 allowed)`);
   });
 
-  // ── 2. Shift conflicts: 3+ people requesting the same shift on the same day ──
-  // Map: {day: {shift: [names]}}
+  // ── 2. Shift conflicts: max 3 people on same shift per day ──
   const shiftMap={};
   DAYS.forEach(d=>{shiftMap[d]={AM:[],PM:[],Mid:[]};});
   allReqs.forEach(r=>{
     DAYS.forEach(d=>{
       const pref=r.shiftPrefs?.[d];
       if(!pref||pref==='Any') return;
-      const st=r.dayStatuses?.[d]||'pending';
-      if(st==='rejected') return;
+      if((r.dayStatuses?.[d]||'pending')==='rejected') return;
       if(shiftMap[d]&&shiftMap[d][pref]) shiftMap[d][pref].push(r.employeeName);
     });
   });
@@ -1559,13 +1558,13 @@ function detectConflicts(){
     ['AM','PM','Mid'].forEach(shift=>{
       const names=shiftMap[d][shift];
       if(names&&names.length>=3)
-        conflicts.push(`<strong>${d} — ${shift} Shift:</strong> ${names.length} people requested ${shift} — ${names.slice(0,4).join(', ')}${names.length>4?'…':''}`);
+        conflicts.push(`<strong>${d} — ${shift} Shift:</strong> ${names.length} people requested ${shift} — ${names.join(', ')} (max 3)`);
     });
   });
 
   // ── Mark individual requests as conflicted ──
   allReqs.forEach(r=>{
-    const dayOffConflict=r.dayOff&&(r.dayOffStatus||'pending')!=='rejected'&&dayOffMap[r.dayOff]?.length>=3;
+    const dayOffConflict=r.dayOff&&(r.dayOffStatus||'pending')!=='rejected'&&dayOffMap[r.dayOff]?.length>=2;
     const shiftConflict=DAYS.some(d=>{
       const pref=r.shiftPrefs?.[d];
       if(!pref||pref==='Any') return false;
@@ -1629,13 +1628,24 @@ function renderReqs(){
       if(pref==='Any'&&!isDO) return '';
       const key=isDO?'dayOff':d;
       const st=isDO?(r.dayOffStatus||'pending'):(r.dayStatuses?.[d]||'pending');
-      const pclr=pref==='OFF'?'var(--a3)':pref==='AM'?'var(--a2)':pref==='PM'?'var(--ac)':pref==='Overnight'?'#888':pref==='Mid'?'var(--a4)':'var(--t2)';
-      const bg=st==='approved'?'rgba(200,255,87,.07)':st==='rejected'?'rgba(255,107,107,.07)':'var(--s2)';
-      const bdr=st==='approved'?'rgba(200,255,87,.35)':st==='rejected'?'rgba(255,107,107,.35)':'var(--bd2)';
-      const tick=st==='approved'?'<span style="font-size:.52rem;color:var(--ac)"> ✓</span>':st==='rejected'?'<span style="font-size:.52rem;color:var(--a3)"> ✕</span>':'';
-      return `<div class="day-pill" style="background:${bg};border:1px solid ${bdr}">
+      const pclr=pref==='OFF'?'var(--red)':pref==='AM'?'var(--a2)':pref==='PM'?'var(--ac)':pref==='Mid'?'var(--a4)':'var(--t2)';
+
+      // Check if THIS specific day is conflicting
+      let isDayConflict=false;
+      if(isDO&&r._conflict){
+        // day-off conflict
+        isDayConflict=true;
+      } else if(!isDO&&r._conflict&&pref!=='Any'){
+        // shift conflict — check if shiftMap has >=2 for this day+shift
+        isDayConflict=true; // simplification: flag all days on a conflict card
+      }
+
+      const bg=st==='approved'?'rgba(0,182,122,.07)':st==='rejected'?'rgba(214,58,58,.07)':isDayConflict?'rgba(214,58,58,.06)':'var(--grey-50)';
+      const bdr=st==='approved'?'var(--success)':st==='rejected'?'var(--red)':isDayConflict?'var(--red)':'var(--grey-200)';
+      const tick=st==='approved'?'<span style="font-size:.52rem;color:var(--success)"> ✓</span>':st==='rejected'?'<span style="font-size:.52rem;color:var(--red)"> ✕</span>':isDayConflict?'<span style="font-size:.52rem;color:var(--red)"> ⚠</span>':'';
+      return `<div class="day-pill" style="background:${bg};border:1.5px solid ${bdr}">
         <span class="dp-name">${d.slice(0,3)}${tick}</span>
-        <span class="dp-val" style="color:${pclr}">${pref}</span>
+        <span class="dp-val" style="color:${isDayConflict&&st==='pending'?'var(--red)':pclr}">${pref}</span>
         <div class="dp-acts">
           ${st!=='approved'?`<button class="dp-btn dp-approve" onclick="appDay('${r.id}','${key}','approved')">✓</button>`:''}
           ${st!=='rejected'?`<button class="dp-btn dp-reject" onclick="appDay('${r.id}','${key}','rejected')">✕</button>`:''}
