@@ -470,12 +470,15 @@ details.card>summary::-webkit-details-marker{display:none;}
       </div>
       <!-- week requests tab -->
       <div id="tab-week">
-        <div class="filter-row">
+        <div class="filter-row" style="flex-wrap:wrap;gap:.5rem">
           <button class="fbtn active" data-filter="all">All</button>
           <button class="fbtn" data-filter="pending">Pending</button>
           <button class="fbtn" data-filter="approved">Approved</button>
           <button class="fbtn" data-filter="rejected">Rejected</button>
           <button class="fbtn" data-filter="conflict">⚠ Conflict</button>
+          <select id="req-week-filter" style="height:30px;font-size:.75rem;padding:0 .6rem;border-radius:100px;border:1.5px solid var(--grey-200);background:var(--white);color:var(--grey-600);cursor:pointer;margin-left:auto">
+            <option value="">All weeks</option>
+          </select>
         </div>
         <div id="req-loading" style="padding:2rem;text-align:center;display:none"><div class="spinner"></div></div>
         <div id="req-cards" style="display:flex;flex-direction:column;gap:.7rem"></div>
@@ -960,7 +963,7 @@ function go(name){
 // EMPLOYEES
 // ══════════════════════════════════════
 async function loadEmps(){
-  try{const s=await fb.getDocs(fb.collection(db,'employees'));emps=[];s.forEach(d=>emps.push({id:d.id,...d.data()}));}
+  try{const s=await _db.collection('employees').get();emps=[];s.forEach(d=>emps.push({id:d.id,...d.data()}));}
   catch(e){toast('Error loading employees','err');}
 }
 function renderEmps(){
@@ -1000,14 +1003,14 @@ async function saveEmp(){
   const ratings={};TASKS.forEach(t=>{ratings[t]=+(el('sr-'+t).dataset.v)||0;});
   try{
     const data={name,tasksKnown,ratings,notes:el('em-notes').value.trim()};
-    if(id)await fb.updateDoc(fb.doc(db,'employees',id),data);
-    else await fb.addDoc(fb.collection(db,'employees'),data);
+    if(id)await _db.collection('employees').doc(id).update(data);
+    else await _db.collection('employees').add(data);
     toast(id?'Updated':'Added','ok');closeM('emp-modal');await loadEmps();renderEmps();
   }catch(e){toast('Error: '+e.message,'err');}
 }
 async function delEmp(){
   const id=el('em-id').value;if(!id||!confirm('Delete?'))return;
-  try{await fb.deleteDoc(fb.doc(db,'employees',id));toast('Deleted','ok');closeM('emp-modal');await loadEmps();renderEmps();}
+  try{await _db.collection('employees').doc(id).delete();toast('Deleted','ok');closeM('emp-modal');await loadEmps();renderEmps();}
   catch(e){toast('Error: '+e.message,'err');}
 }
 
@@ -1016,7 +1019,7 @@ async function delEmp(){
 // ══════════════════════════════════════
 async function loadWeeks(){
   try{
-    const s=await fb.getDocs(fb.query(fb.collection(db,'weeks'),fb.orderBy('createdAt','desc')));
+    const s=await _db.collection('weeks').orderBy('createdAt','desc').get();
     weeks=[];
     s.forEach(d=>{const dat=d.data();weeks.push({id:d.id,...dat,rows:typeof dat.rows==='string'?JSON.parse(dat.rows):dat.rows||[]});});
     // activeWid = most recent published week; buildWid = most recent draft
@@ -1097,7 +1100,7 @@ async function createWeek(){
   });
   const data={label,startDate,endDate,published:false,params:{minCalls:10,minZD:6,minCancel:3,minTasks:1,fbCalls:7,fbZD:4,fbCancel:2,minRating:2},createdAt:Date.now(),rows:JSON.stringify(rows)};
   try{
-    const ref=await fb.addDoc(fb.collection(db,'weeks'),data);
+    const ref=await _db.collection('weeks').add(data);
     weeks.unshift({id:ref.id,...data,rows});
     buildWid=ref.id;
     closeM('nw-modal');renderWeekBars();renderBuild();
@@ -1109,7 +1112,7 @@ async function publishWeek(){
   const week=getWeek(buildWid);if(!week)return;
   if(!confirm(`Publish "${week.label}" as the current active schedule?`))return;
   try{
-    await fb.updateDoc(fb.doc(db,'weeks',buildWid),{published:true});
+    await _db.collection('weeks').doc(buildWid).update({published:true});
     week.published=true;
     activeWid=buildWid;
     renderWeekBars();renderSchedule();
@@ -1150,7 +1153,7 @@ async function writeApprovalToSchedule(empName, day, shift, isDayOff){
     row.days[day]={shift,start:dt.s,end:dt.e,task:'—',note:'',fromReq:true};
   }
   try{
-    await fb.updateDoc(fb.doc(db,'weeks',draft.id),{rows:JSON.stringify(draft.rows)});
+    await _db.collection('weeks').doc(draft.id).update({rows:JSON.stringify(draft.rows)});
     // Re-render build page if active
     if(el('page-build').classList.contains('active')) renderBuild();
     toast(`✓ ${empName} ${day} → ${isDayOff?'OFF':shift}`,'ok');
@@ -1164,7 +1167,7 @@ async function removeFromSchedule(empName, day){
   if(!row)return;
   row.days[day]={shift:'',start:'',end:'',task:'—',note:'',fromReq:false};
   try{
-    await fb.updateDoc(fb.doc(db,'weeks',draft.id),{rows:JSON.stringify(draft.rows)});
+    await _db.collection('weeks').doc(draft.id).update({rows:JSON.stringify(draft.rows)});
     if(el('page-build').classList.contains('active')) renderBuild();
   }catch(e){console.error(e);}
 }
@@ -1300,7 +1303,7 @@ async function saveCell(){
   const row=week.rows.find(r=>r.name===empName);if(!row)return;
   row.days[day]={shift:cellShiftType,start:el('cm-s').value,end:el('cm-e').value,task:row.days[day]?.task||'—',note:el('cm-n').value.trim(),fromReq:false};
   try{
-    await fb.updateDoc(fb.doc(db,'weeks',wid),{rows:JSON.stringify(week.rows)});
+    await _db.collection('weeks').doc(wid).update({rows:JSON.stringify(week.rows)});
     closeM('cell-modal');renderBuild();toast('Saved','ok');
   }catch(e){toast('Error: '+e.message,'err');}
 }
@@ -1310,8 +1313,8 @@ async function clearCell(){
   const row=week.rows.find(r=>r.name===empName);if(!row)return;
   row.days[day]={shift:'',start:'',end:'',task:'—',note:'',fromReq:false};
   try{
-    await fb.updateDoc(fb.doc(db,'weeks',wid),{rows:JSON.stringify(week.rows)});
-    closeM('cell-modal');renderBuild();toast('Cleared','ok');
+    await _db.collection('weeks').doc(wid).update({rows:JSON.stringify(week.rows)});
+    closeM('cell-modal');renderBuild();toast('Cell cleared','ok');
   }catch(e){toast('Error: '+e.message,'err');}
 }
 
@@ -1417,7 +1420,7 @@ async function assignTasksAndSave(){
     });
   });
   try{
-    await fb.updateDoc(fb.doc(db,'weeks',week.id),{rows:JSON.stringify(week.rows),params:p});
+    await _db.collection('weeks').doc(week.id).update({rows:JSON.stringify(week.rows),params:p});
     renderBuild();toast('Tasks assigned!','ok');
   }catch(e){toast('Error: '+e.message,'err');}
   btn.disabled=false;btn.textContent='⚡ Assign Tasks';
@@ -1515,69 +1518,98 @@ function pill(i,c,t){const cls=c>=t?'pill-ok':c>=Math.ceil(t*.6)?'pill-warn':'pi
 async function loadRequests(){
   el('req-loading').style.display='block';el('req-cards').innerHTML='';
   try{
-    const s=await fb.getDocs(fb.query(fb.collection(db,'requests'),fb.orderBy('createdAt','desc')));
+    const s=await _db.collection('requests').orderBy('createdAt','desc').get();
     allReqs=[];s.forEach(d=>allReqs.push({id:d.id,...d.data()}));
     buildApprovedMap();detectConflicts();updateBadge();
+    populateReqWeekFilter();
   }catch(e){toast('Error: '+e.message,'err');}
   el('req-loading').style.display='none';
   renderReqs();
   // Also refresh switch badge silently
   try{
-    const s2=await fb.getDocs(fb.query(fb.collection(db,'switches'),fb.orderBy('createdAt','desc')));
+    const s2=await _db.collection('switches').orderBy('createdAt','desc').get();
     allSwitches=[];s2.forEach(d=>allSwitches.push({id:d.id,...d.data()}));
     updateSwBadge();
   }catch(e){}
 }
 
+function populateReqWeekFilter(){
+  const sel=el('req-week-filter');
+  if(!sel) return;
+  // Collect unique weeks from requests
+  const weekMap={};
+  allReqs.forEach(r=>{
+    if(r.weekId&&r.weekLabel) weekMap[r.weekId]=r.weekLabel;
+  });
+  const cur=sel.value;
+  sel.innerHTML='<option value="">All weeks</option>'+
+    Object.entries(weekMap).map(([id,lbl])=>`<option value="${id}">${lbl}</option>`).join('');
+  if(cur) sel.value=cur;
+  sel.onchange=renderReqs;
+}
+
 function detectConflicts(){
   const conflicts=[];
 
-  // ── 1. Day-off: only 1 person allowed per day ──
-  const dayOffMap={};DAYS.forEach(d=>dayOffMap[d]=[]);
+  // Group requests by weekId — only compare within the same week
+  const byWeek={};
   allReqs.forEach(r=>{
-    if((r.dayOffStatus||'pending')!=='rejected'&&r.dayOff)
-      dayOffMap[r.dayOff].push(r.employeeName);
-  });
-  DAYS.forEach(d=>{
-    if(dayOffMap[d].length>=2)
-      conflicts.push(`<strong>${d} — Day Off:</strong> ${dayOffMap[d].length} people requested off — ${dayOffMap[d].join(', ')} (only 1 allowed)`);
+    const key=r.weekId||'no-week';
+    if(!byWeek[key]) byWeek[key]={label:r.weekLabel||key, reqs:[]};
+    byWeek[key].reqs.push(r);
   });
 
-  // ── 2. Shift conflicts: max 3 people on same shift per day ──
-  const shiftMap={};
-  DAYS.forEach(d=>{shiftMap[d]={AM:[],PM:[],Mid:[]};});
-  allReqs.forEach(r=>{
+  // Reset all conflict flags first
+  allReqs.forEach(r=>r._conflict=false);
+
+  Object.entries(byWeek).forEach(([weekId,{label,reqs}])=>{
+
+    // ── 1. Day-off: only 1 person allowed per day per week ──
+    const dayOffMap={};DAYS.forEach(d=>dayOffMap[d]=[]);
+    reqs.forEach(r=>{
+      if((r.dayOffStatus||'pending')!=='rejected'&&r.dayOff)
+        dayOffMap[r.dayOff].push(r.employeeName);
+    });
     DAYS.forEach(d=>{
-      const pref=r.shiftPrefs?.[d];
-      if(!pref||pref==='Any') return;
-      if((r.dayStatuses?.[d]||'pending')==='rejected') return;
-      if(shiftMap[d]&&shiftMap[d][pref]) shiftMap[d][pref].push(r.employeeName);
+      if(dayOffMap[d].length>=2){
+        conflicts.push(`<strong>[${label}] ${d} — Day Off:</strong> ${dayOffMap[d].join(', ')} (only 1 allowed)`);
+        // Mark the conflicting requests
+        reqs.forEach(r=>{
+          if(r.dayOff===d&&(r.dayOffStatus||'pending')!=='rejected') r._conflict=true;
+        });
+      }
     });
-  });
-  DAYS.forEach(d=>{
-    ['AM','PM','Mid'].forEach(shift=>{
-      const names=shiftMap[d][shift];
-      if(names&&names.length>=3)
-        conflicts.push(`<strong>${d} — ${shift} Shift:</strong> ${names.length} people requested ${shift} — ${names.join(', ')} (max 3)`);
-    });
-  });
 
-  // ── Mark individual requests as conflicted ──
-  allReqs.forEach(r=>{
-    const dayOffConflict=r.dayOff&&(r.dayOffStatus||'pending')!=='rejected'&&dayOffMap[r.dayOff]?.length>=2;
-    const shiftConflict=DAYS.some(d=>{
-      const pref=r.shiftPrefs?.[d];
-      if(!pref||pref==='Any') return false;
-      if((r.dayStatuses?.[d]||'pending')==='rejected') return false;
-      return shiftMap[d]?.[pref]?.length>=3;
+    // ── 2. Shift conflicts: max 3 per shift per day per week ──
+    const shiftMap={};
+    DAYS.forEach(d=>{shiftMap[d]={AM:[],PM:[],Mid:[]};});
+    reqs.forEach(r=>{
+      DAYS.forEach(d=>{
+        const pref=r.shiftPrefs?.[d];
+        if(!pref||pref==='Any') return;
+        if((r.dayStatuses?.[d]||'pending')==='rejected') return;
+        if(shiftMap[d]&&shiftMap[d][pref]) shiftMap[d][pref].push(r.employeeName);
+      });
     });
-    r._conflict=!!(dayOffConflict||shiftConflict);
+    DAYS.forEach(d=>{
+      ['AM','PM','Mid'].forEach(shift=>{
+        const names=shiftMap[d][shift];
+        if(names&&names.length>=3){
+          conflicts.push(`<strong>[${label}] ${d} — ${shift}:</strong> ${names.join(', ')} (max 3)`);
+          // Mark the conflicting requests
+          reqs.forEach(r=>{
+            const pref=r.shiftPrefs?.[d];
+            if(pref===shift&&(r.dayStatuses?.[d]||'pending')!=='rejected') r._conflict=true;
+          });
+        }
+      });
+    });
   });
 
   const ban=el('conflict-banner'),list=el('conflict-list');
   if(conflicts.length){
     ban.style.display='block';
-    list.innerHTML=conflicts.map(c=>`<div>• ${c}</div>`).join('');
+    list.innerHTML=conflicts.map(c=>`<div style="margin-bottom:.2rem">• ${c}</div>`).join('');
   } else {
     ban.style.display='none';
   }
@@ -1605,6 +1637,10 @@ function renderReqs(){
   else if(reqFilter==='approved') filtered=allReqs.filter(r=>DAYS.some(d=>getDaySt(r,d)==='approved')||(r.dayOff&&r.dayOffStatus==='approved'));
   else if(reqFilter==='rejected') filtered=allReqs.filter(r=>DAYS.every(d=>!r.shiftPrefs?.[d]||r.shiftPrefs[d]==='Any'||getDaySt(r,d)==='rejected')&&(!r.dayOff||r.dayOffStatus==='rejected'));
   else if(reqFilter==='pending')  filtered=allReqs.filter(r=>DAYS.some(d=>r.shiftPrefs?.[d]&&r.shiftPrefs[d]!=='Any'&&getDaySt(r,d)==='pending')||(r.dayOff&&(r.dayOffStatus||'pending')==='pending'));
+
+  // Apply week filter
+  const weekFilterVal=el('req-week-filter')?.value;
+  if(weekFilterVal) filtered=filtered.filter(r=>r.weekId===weekFilterVal);
 
   if(!filtered.length){cards.innerHTML='';empty.style.display='block';return;}
   empty.style.display='none';
@@ -1660,7 +1696,7 @@ function renderReqs(){
       <div class="req-hdr">
         <div>
           <div class="req-name">${r.employeeName}</div>
-          <div class="req-meta">${r.dayOff?`Off: <strong>${r.dayOff}</strong> · `:''}Submitted ${new Date(r.createdAt).toLocaleDateString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</div>
+          <div class="req-meta">${r.weekLabel?`<span style="background:var(--blue-light);color:var(--blue);font-weight:700;font-size:.68rem;padding:.1rem .45rem;border-radius:100px;margin-right:.35rem">${r.weekLabel}</span>`:''}${r.dayOff?`Off: <strong>${r.dayOff}</strong> · `:''}Submitted ${new Date(r.createdAt).toLocaleDateString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</div>
         </div>
         <div style="display:flex;align-items:center;gap:.4rem;flex-wrap:wrap">
           <span class="sp ${scls}">${stxt}</span>
@@ -1685,7 +1721,7 @@ async function appDay(reqId, key, status){
   const overall=sts.every(s=>s==='approved')?'approved':sts.every(s=>s==='rejected')?'rejected':'partial';
   r.status=overall;update.status=overall;
   try{
-    await fb.updateDoc(fb.doc(db,'requests',reqId),update);
+    await _db.collection('requests').doc(reqId).update(update);
     // Write to schedule if approved
     if(status==='approved'){
       const isDO=key==='dayOff';
@@ -1709,7 +1745,7 @@ async function appAll(reqId){
   DAYS.forEach(d=>{if(r.shiftPrefs?.[d]&&r.shiftPrefs[d]!=='Any')r.dayStatuses[d]='approved';});
   r.status='approved';
   try{
-    await fb.updateDoc(fb.doc(db,'requests',reqId),{status:'approved',dayOffStatus:r.dayOffStatus||null,dayStatuses:r.dayStatuses||{}});
+    await _db.collection('requests').doc(reqId).update({status:'approved',dayOffStatus:r.dayOffStatus||null,dayStatuses:r.dayStatuses||{}});
     // Write all approved days to schedule
     if(r.dayOff) await writeApprovalToSchedule(r.employeeName,r.dayOff,'OFF',true);
     for(const d of DAYS){
@@ -1728,7 +1764,7 @@ async function rejAll(reqId){
   DAYS.forEach(d=>{if(r.shiftPrefs?.[d]&&r.shiftPrefs[d]!=='Any')r.dayStatuses[d]='rejected';});
   r.status='rejected';
   try{
-    await fb.updateDoc(fb.doc(db,'requests',reqId),{status:'rejected',dayOffStatus:r.dayOffStatus||null,dayStatuses:r.dayStatuses||{}});
+    await _db.collection('requests').doc(reqId).update({status:'rejected',dayOffStatus:r.dayOffStatus||null,dayStatuses:r.dayStatuses||{}});
     buildApprovedMap();detectConflicts();renderReqs();updateBadge();
     toast('All rejected','ok');
   }catch(e){toast('Error: '+e.message,'err');}
@@ -2044,7 +2080,7 @@ async function loadPortalSchedule(){
   el('portal-sched-content').style.display='none';
   el('portal-sched-empty').style.display='none';
   try{
-    const s=await fb.getDocs(fb.query(fb.collection(db,'weeks'),fb.orderBy('createdAt','desc')));
+    const s=await _db.collection('weeks').orderBy('createdAt','desc').get();
     const allWeeks=[];
     s.forEach(d=>{const dat=d.data();allWeeks.push({id:d.id,...dat,rows:typeof dat.rows==='string'?JSON.parse(dat.rows):dat.rows||[]});});
     // Find the most recent published week
@@ -2307,7 +2343,7 @@ function switchFormType(type){
 
 async function loadEmpsForForm(){
   try{
-    const s=await fb.getDocs(fb.collection(db,'employees'));
+    const s=await _db.collection('employees').get();
     const names=[];s.forEach(d=>names.push(d.data().name));names.sort();
     const opts='<option value="">— Select —</option>'+names.map(n=>`<option>${n}</option>`).join('');
     el('fn').innerHTML=opts;
@@ -2329,7 +2365,7 @@ async function submitForm(){
   const shiftPrefs={};DAYS.forEach(d=>{shiftPrefs[d]=el('fp-'+d)?.value||'Any';});
   const btn=el('btn-submit-form');btn.disabled=true;btn.textContent='Submitting…';
   try{
-    await fb.addDoc(fb.collection(db,'requests'),{employeeName:name,dayOff,shiftPrefs,note:el('fnote').value.trim(),status:'pending',dayOffStatus:'pending',dayStatuses:{},createdAt:Date.now(),type:'week'});
+    await _db.collection('requests').add({employeeName:name,dayOff,shiftPrefs,note:el('fnote').value.trim(),status:'pending',dayOffStatus:'pending',dayStatuses:{},createdAt:Date.now(),type:'week'});
     el('pub-form').style.display='none';el('form-ok').style.display='flex';
   }catch(e){err.textContent='Error: '+e.message;err.style.display='block';}
   btn.disabled=false;btn.textContent='Submit Week Request';
@@ -2349,7 +2385,7 @@ async function submitSwitchForm(){
   if(!myShift||!otherShift){err.textContent='Select both shift types.';err.style.display='block';return;}
   const btn=el('btn-submit-sw');btn.disabled=true;btn.textContent='Submitting…';
   try{
-    await fb.addDoc(fb.collection(db,'switches'),{
+    await _db.collection('switches').add({
       requesterName:myName,requesterShift:myShift,
       colleagueName:otherName,colleagueShift:otherShift,
       day,reason:el('sw-reason').value.trim(),
@@ -2386,7 +2422,7 @@ function filterSwitch(btn,f){
 async function loadSwitches(){
   el('sw-loading').style.display='block';el('sw-cards').innerHTML='';
   try{
-    const s=await fb.getDocs(fb.query(fb.collection(db,'switches'),fb.orderBy('createdAt','desc')));
+    const s=await _db.collection('switches').orderBy('createdAt','desc').get();
     allSwitches=[];s.forEach(d=>allSwitches.push({id:d.id,...d.data()}));
     updateSwBadge();
   }catch(e){toast('Error loading switches','err');}
@@ -2453,7 +2489,7 @@ function renderSwitches(){
 async function resolveSwitch(swId, status){
   const sw=allSwitches.find(x=>x.id===swId);if(!sw)return;
   try{
-    await fb.updateDoc(fb.doc(db,'switches',swId),{status});
+    await _db.collection('switches').doc(swId).update({status});
     sw.status=status;
 
     // If approved: swap the two employees' shifts in the active draft week
@@ -2470,7 +2506,7 @@ async function resolveSwitch(swId, status){
           const taskA=cellA.task,taskB=cellB.task;
           rowA.days[day]={...cellB,task:taskA,fromReq:false,note:'Switch approved'};
           rowB.days[day]={...cellA,task:taskB,fromReq:false,note:'Switch approved'};
-          await fb.updateDoc(fb.doc(db,'weeks',draft.id),{rows:JSON.stringify(draft.rows)});
+          await _db.collection('weeks').doc(draft.id).update({rows:JSON.stringify(draft.rows)});
           if(el('page-build').classList.contains('active')) renderBuild();
           toast(`Swap applied: ${sw.requesterName} ⇄ ${sw.colleagueName} on ${day}`,'ok');
         } else {
