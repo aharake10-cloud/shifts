@@ -578,7 +578,26 @@ details.card>summary::-webkit-details-marker{display:none;}
     <div class="modal-title" id="em-title">Add employee</div>
     <button class="mc" data-modal="emp-modal">✕</button>
     <input type="hidden" id="em-id">
-    <div class="frow"><label>Full name</label><input type="text" id="em-name"></div>
+    <input type="hidden" id="em-uid">
+    <div class="frow"><label>Full name</label><input type="text" id="em-name" placeholder="e.g. Yousef Dhainy"></div>
+
+    <!-- Account section — shown when adding new employee -->
+    <div id="em-account-section">
+      <div class="frow"><label>Login Email</label><input type="email" id="em-email" placeholder="e.g. yousef@company.com"></div>
+      <div class="frow"><label>Password</label>
+        <div style="position:relative">
+          <input type="password" id="em-password" placeholder="Min 6 characters" style="padding-right:2.5rem">
+          <button type="button" onclick="togglePwVis()" style="position:absolute;right:.75rem;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:.85rem;color:var(--grey-400)" id="em-pw-eye">👁</button>
+        </div>
+      </div>
+      <div style="font-size:.75rem;color:var(--grey-400);margin-top:-.5rem;margin-bottom:.75rem">Employee will use this email + password to log in to their portal.</div>
+    </div>
+    <!-- Existing account info — shown when editing -->
+    <div id="em-account-info" style="display:none;background:var(--grey-50);border-radius:var(--r2);padding:.6rem .9rem;margin-bottom:.75rem;font-size:.82rem;color:var(--grey-600)">
+      <span id="em-account-email-display"></span>
+      <span style="margin-left:.5rem;font-size:.72rem;color:var(--grey-400)">(to change password, use Firebase Console)</span>
+    </div>
+
     <div class="frow"><label>Tasks known</label>
       <div class="check-group" id="em-tasks">
         <div class="check-chip" data-v="Calls"><input>Calls</div>
@@ -594,6 +613,7 @@ details.card>summary::-webkit-details-marker{display:none;}
       </div>
     </div>
     <div class="frow"><label>Notes</label><textarea id="em-notes" rows="2"></textarea></div>
+    <div class="ferror" id="em-err"></div>
     <div class="flex jb mt4 gap-2">
       <button class="btn btn-danger btn-sm" id="btn-del-emp" style="display:none">Delete</button>
       <div class="flex gap-2 mla"><button class="btn btn-ghost" id="btn-cancel-emp">Cancel</button><button class="btn btn-green" id="btn-save-emp">Save</button></div>
@@ -985,7 +1005,10 @@ function openEmpModal(id){
   buildStarBtns();
   el('em-title').textContent=id?'Edit Employee':'Add Employee';
   el('btn-del-emp').style.display=id?'inline-flex':'none';
-  el('em-id').value=id||'';el('em-name').value='';el('em-notes').value='';
+  el('em-id').value=id||'';el('em-uid').value='';
+  el('em-name').value='';el('em-notes').value='';
+  el('em-email').value='';el('em-password').value='';
+  el('em-err').style.display='none';
   document.querySelectorAll('#em-tasks .check-chip').forEach(c=>c.classList.remove('on'));
   TASKS.forEach(t=>setStar(t,0));
   if(id){
@@ -993,20 +1016,59 @@ function openEmpModal(id){
     el('em-name').value=e.name;el('em-notes').value=e.notes||'';
     (e.tasksKnown||[]).forEach(t=>{const c=document.querySelector(`#em-tasks [data-v="${t}"]`);if(c)c.classList.add('on');});
     TASKS.forEach(t=>setStar(t,e.ratings?.[t]||0));
+    el('em-uid').value=e.uid||'';
+    el('em-account-section').style.display='none';
+    el('em-account-info').style.display='block';
+    el('em-account-email-display').textContent=e.email?'Login: '+e.email:'No login account yet';
+  } else {
+    el('em-account-section').style.display='block';
+    el('em-account-info').style.display='none';
   }
   openM('emp-modal');
 }
+
+function togglePwVis(){
+  const pw=el('em-password');
+  pw.type=pw.type==='password'?'text':'password';
+}
+
 async function saveEmp(){
   const id=el('em-id').value,name=v('em-name');
-  if(!name){toast('Name required','err');return;}
+  const err=el('em-err');err.style.display='none';
+  if(!name){err.textContent='Name is required.';err.style.display='block';return;}
   const tasksKnown=Array.from(document.querySelectorAll('#em-tasks .check-chip.on')).map(c=>c.dataset.v);
   const ratings={};TASKS.forEach(t=>{ratings[t]=+(el('sr-'+t).dataset.v)||0;});
+  const btn=el('btn-save-emp');btn.disabled=true;btn.textContent='Saving…';
   try{
-    const data={name,tasksKnown,ratings,notes:el('em-notes').value.trim()};
-    if(id)await _db.collection('employees').doc(id).update(data);
-    else await _db.collection('employees').add(data);
-    toast(id?'Updated':'Added','ok');closeM('emp-modal');await loadEmps();renderEmps();
-  }catch(e){toast('Error: '+e.message,'err');}
+    if(id){
+      // Edit existing
+      const data={name,tasksKnown,ratings,notes:el('em-notes').value.trim()};
+      await _db.collection('employees').doc(id).update(data);
+      const uid=el('em-uid').value;
+      if(uid) await _db.collection('users').doc(uid).update({name});
+      toast('Employee updated','ok');
+    } else {
+      // Add new — create Firebase Auth account via REST (avoids signing out admin)
+      const email=v('em-email');
+      const password=el('em-password').value;
+      if(!email){err.textContent='Email is required.';err.style.display='block';btn.disabled=false;btn.textContent='Save';return;}
+      if(!password||password.length<6){err.textContent='Password must be at least 6 characters.';err.style.display='block';btn.disabled=false;btn.textContent='Save';return;}
+      const apiKey='AIzaSyD2KTtnwgH8h8oNe0OLx_SH_ySYTIKyhns';
+      const res=await fetch('https://identitytoolkit.googleapis.com/v1/accounts:signUp?key='+apiKey,{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({email,password,returnSecureToken:true})
+      });
+      const result=await res.json();
+      if(result.error){err.textContent='Account error: '+result.error.message;err.style.display='block';btn.disabled=false;btn.textContent='Save';return;}
+      const newUid=result.localId;
+      const data={name,tasksKnown,ratings,notes:el('em-notes').value.trim(),email,uid:newUid};
+      await _db.collection('employees').add(data);
+      await _db.collection('users').doc(newUid).set({name,role:'employee',email});
+      toast('✅ '+name+' added with login account!','ok');
+    }
+    closeM('emp-modal');await loadEmps();renderEmps();
+  }catch(e){err.textContent='Error: '+e.message;err.style.display='block';}
+  btn.disabled=false;btn.textContent='Save';
 }
 async function delEmp(){
   const id=el('em-id').value;if(!id||!confirm('Delete?'))return;
@@ -2536,6 +2598,7 @@ window.switchReqTab=switchReqTab; window.filterSwitch=filterSwitch;
 window.loadSwitches=loadSwitches; window.resolveSwitch=resolveSwitch;
 window.copyFormLink=copyFormLink; window.openEmpModal=openEmpModal;
 window.saveEmp=saveEmp; window.delEmp=delEmp; window.selWeek=selWeek;
+window.togglePwVis=togglePwVis;
 window.closeM=closeM; window.openM=openM;
 window.submitForm=submitForm; window.submitSwitchForm=submitSwitchForm;
 window.switchFormType=switchFormType; window.switchPortalTab=switchPortalTab;
