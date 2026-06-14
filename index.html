@@ -587,7 +587,7 @@ details.card>summary::-webkit-details-marker{display:none;}
       <div class="frow"><label>Password</label>
         <div style="position:relative">
           <input type="password" id="em-password" placeholder="Min 6 characters" style="padding-right:2.5rem">
-          <button type="button" onclick="togglePwVis()" style="position:absolute;right:.75rem;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:.85rem;color:var(--grey-400)" id="em-pw-eye">👁</button>
+          <button type="button" id="em-pw-eye" style="position:absolute;right:.75rem;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:.85rem;color:var(--grey-400)">👁</button>
         </div>
       </div>
       <div style="font-size:.75rem;color:var(--grey-400);margin-top:-.5rem;margin-bottom:.75rem">Employee will use this email + password to log in to their portal.</div>
@@ -995,7 +995,7 @@ function renderEmps(){
     <td>${(e.tasksKnown||[]).map(t=>`<span class="badge ${TCLS[t]||''}">${t}</span>`).join(' ')}</td>
     <td>${stars(e.ratings?.Calls||0)}</td><td>${stars(e.ratings?.Zendesk||0)}</td>
     <td>${stars(e.ratings?.Emails||0)}</td>
-    <td><button class="btn btn-ghost btn-xs" onclick="openEmpModal('${e.id}')">Edit</button></td>
+    <td><button class="btn btn-ghost btn-xs" data-empid="${e.id}">Edit</button></td>
   </tr>`).join('');
 }
 function stars(n){return '<div class="stars">'+[1,2,3,4,5].map(i=>`<div class="star ${i<=n?'s-on':'s-off'}"></div>`).join('')+'</div>';}
@@ -2640,7 +2640,8 @@ wire('btn-publish',      publishWeek);
 wire('btn-create-week',  createWeek);
 wire('btn-copy-form',    copyFormLink);
 wire('btn-refresh-req',  loadRequests);
-wire('btn-add-emp',      openEmpModal);
+wire('btn-add-emp',      ()=>openEmpModal());
+wire('em-pw-eye',        togglePwVis);
 wire('btn-save-emp',     saveEmp);
 wire('btn-del-emp',      delEmp);
 wire('btn-save-cell',    saveCell);
@@ -2669,6 +2670,9 @@ document.querySelectorAll('.nav-item[data-page]').forEach(el2 => {
 
 // Week chips — delegated since they're dynamic
 document.addEventListener('click', function(e) {
+  const empEdit = e.target.closest('[data-empid]');
+  if (empEdit) openEmpModal(empEdit.dataset.empid);
+
   const chip = e.target.closest('.wk-chip[data-wid]');
   if (chip) selWeek(chip.dataset.wid, chip.dataset.page);
 
