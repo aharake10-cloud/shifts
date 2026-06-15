@@ -1059,11 +1059,37 @@ async function saveEmp(){
         body:JSON.stringify({email,password,returnSecureToken:true})
       });
       const result=await res.json();
-      if(result.error){err.textContent='Account error: '+result.error.message;err.style.display='block';btn.disabled=false;btn.textContent='Save';return;}
+      if(result.error){
+        const msg=result.error.message;
+        const friendly=
+          msg==='EMAIL_EXISTS'?'This email is already registered. Use a different email.':
+          msg==='INVALID_EMAIL'?'Invalid email address format.':
+          msg==='WEAK_PASSWORD : Password should be at least 6 characters'?'Password must be at least 6 characters.':
+          msg==='OPERATION_NOT_ALLOWED'?'Email/password sign-up is not enabled. Go to Firebase Console → Authentication → Sign-in method → enable Email/Password.':
+          'Error: '+msg;
+        err.textContent=friendly;err.style.display='block';btn.disabled=false;btn.textContent='Save';return;
+      }
       const newUid=result.localId;
       const data={name,tasksKnown,ratings,notes:el('em-notes').value.trim(),email,uid:newUid};
-      await _db.collection('employees').add(data);
+      const empRef=await _db.collection('employees').add(data);
       await _db.collection('users').doc(newUid).set({name,role:'employee',email});
+
+      // Add empty row for this employee to all existing weeks
+      const weeksSnap=await _db.collection('weeks').get();
+      for(const wd of weeksSnap.docs){
+        const wdat=wd.data();
+        const rows=typeof wdat.rows==='string'?JSON.parse(wdat.rows):wdat.rows||[];
+        // Only add if not already there
+        if(!rows.find(r=>r.name===name)){
+          const newRow={name,empId:empRef.id,days:{}};
+          DAYS.forEach(d=>{newRow.days[d]={shift:'',start:'',end:'',task:'—',note:'',fromReq:false};});
+          rows.push(newRow);
+          await _db.collection('weeks').doc(wd.id).update({rows:JSON.stringify(rows)});
+        }
+      }
+      // Refresh local weeks
+      await loadWeeks();
+
       toast('✅ '+name+' added with login account!','ok');
     }
     closeM('emp-modal');await loadEmps();renderEmps();
