@@ -635,7 +635,7 @@ details.card>summary::-webkit-details-marker{display:none;}
       <button class="btn btn-ghost btn-sm" id="btn-logout">Sign out</button>
     </div>
   </div>
-  <div style="max-width:700px;margin:0 auto;padding:2rem 1.5rem">
+  <div style="max-width:1100px;margin:0 auto;padding:2rem 1.5rem">
     <div class="req-tabs" style="margin-bottom:1.75rem">
       <button class="rtab active" id="ptab-sched" data-tab="sched">📅 My Schedule</button>
       <button class="rtab" id="ptab-req" data-tab="req">📋 Request Week</button>
@@ -2103,30 +2103,32 @@ function renderPortalDays(){
   // ── Full team table ──
   const outerDiv=document.createElement('div');
   outerDiv.className='sched-outer';
+  outerDiv.style.overflowX='visible'; // no scroll
   const tbl=document.createElement('table');
   tbl.className='sched-tbl';
-  tbl.style.minWidth='700px';
+  tbl.style.cssText='min-width:unset;width:100%;table-layout:fixed;';
 
   // Header
   const thead=tbl.createTHead();
   const hr=thead.insertRow();
   const th0=document.createElement('th');
   th0.className='name-th';
+  th0.style.cssText='width:110px;min-width:110px;font-size:.62rem;';
   th0.innerHTML='<span style="color:var(--grey-400)">Employee</span>';
   hr.appendChild(th0);
 
   DAYS.forEach(d=>{
     const th=document.createElement('th');
-    th.className='day-th';
+    th.style.cssText='padding:.4rem .25rem;font-size:.6rem;text-align:center;width:calc((100% - 110px)/7);';
     let isToday=false;
     if(portalWeek.startDate){
       const dd=new Date(portalWeek.startDate);
       dd.setDate(dd.getDate()+DAYS.indexOf(d));dd.setHours(0,0,0,0);
       isToday=dd.getTime()===today.getTime();
     }
-    const dateStr=portalWeek.startDate?`<span style="font-size:.56rem;font-weight:400;display:block;color:var(--grey-400)">${dayDate(portalWeek.startDate,d)}</span>`:'';
-    th.innerHTML=d.slice(0,3)+dateStr+(isToday?`<span style="display:inline-block;margin-top:2px;font-size:.55rem;font-weight:700;color:var(--primary);background:rgba(240,35,60,.12);padding:.06rem .4rem;border-radius:100px">today</span>`:'');
-    if(isToday) th.style.cssText='background:rgba(240,35,60,.04);';
+    const dateStr=portalWeek.startDate?`<span style="font-size:.55rem;font-weight:400;display:block;color:var(--grey-400)">${dayDate(portalWeek.startDate,d)}</span>`:'';
+    th.innerHTML=d.slice(0,3)+dateStr+(isToday?`<span style="display:inline-block;margin-top:2px;font-size:.52rem;font-weight:700;color:var(--primary);background:rgba(240,35,60,.12);padding:.04rem .35rem;border-radius:100px">today</span>`:'');
+    if(isToday) th.style.background='rgba(240,35,60,.04)';
     hr.appendChild(th);
   });
 
@@ -2136,19 +2138,21 @@ function renderPortalDays(){
     const isMe=row.name===portalEmpName;
     const tr=tbody.insertRow();
 
-    // Name cell
+    // Name cell — compact
     const td0=tr.insertCell();
     td0.className='name-td';
+    td0.style.cssText='padding:.35rem .5rem;font-size:.72rem;width:110px;min-width:110px;';
     if(isMe){
-      td0.style.cssText='background:rgba(240,35,60,.05);border-right:3px solid var(--primary);';
-      td0.innerHTML=`<span style="font-weight:800;color:var(--primary)">${row.name}</span><div style="font-size:.62rem;font-weight:600;color:var(--primary);opacity:.7">You</div>`;
+      td0.style.cssText+='background:rgba(240,35,60,.05);border-right:3px solid var(--primary);';
+      td0.innerHTML=`<span style="font-weight:800;color:var(--primary);font-size:.75rem">${row.name}</span><div style="font-size:.58rem;font-weight:600;color:var(--primary);opacity:.7">You</div>`;
     } else {
-      td0.innerHTML=`<span style="font-weight:600">${row.name}</span>`;
+      td0.innerHTML=`<span style="font-weight:600;font-size:.75rem">${row.name}</span>`;
     }
 
     DAYS.forEach(d=>{
       const c=row.days[d]||{shift:'',start:'',end:'',task:'—'};
       const td=tr.insertCell();
+      td.style.padding='0';
 
       let isToday=false;
       if(portalWeek.startDate){
@@ -2162,6 +2166,7 @@ function renderPortalDays(){
       const div=document.createElement('div');
       const bg=SHIFT_BG[c.shift]||'c-empty';
       div.className=`cell ${bg}`;
+      div.style.cssText='padding:.3rem .2rem;min-height:44px;gap:1px;';
 
       const lc=SHIFT_LC[c.shift]||'';
       const shift=c.shift||'';
@@ -2169,9 +2174,9 @@ function renderPortalDays(){
       const isOff=shift==='OFF'||shift==='Paid'||shift==='Leave';
       const tlc=TASK_LC[c.task]||'';
 
-      div.innerHTML=`<span class="c-shift ${lc}">${shift||'—'}</span>
-        ${timeStr?`<span class="c-times">${timeStr}</span>`:''}
-        ${!isOff&&c.task&&c.task!=='—'?`<span class="c-task ${tlc}">${c.task}</span>`:''}`;
+      div.innerHTML=`<span class="c-shift ${lc}" style="font-size:.58rem">${shift||'—'}</span>
+        ${timeStr?`<span class="c-times" style="font-size:.6rem">${timeStr}</span>`:''}
+        ${!isOff&&c.task&&c.task!=='—'?`<span class="c-task ${tlc}" style="font-size:.55rem">${c.task}</span>`:''}`;
       td.appendChild(div);
     });
   });
