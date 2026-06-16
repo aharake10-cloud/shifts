@@ -2064,93 +2064,126 @@ function renderMyRequest(){
 }
 
 function renderPortalDays(){
-  const row=portalWeek?.rows?.find(r=>r.name===portalEmpName);
   el('portal-sched-content').style.display='block';
   el('portal-sched-empty').style.display='none';
 
   const today=new Date();today.setHours(0,0,0,0);
-
-  // Build exactly the same table as admin but for just this employee
   const wrap=el('portal-days');
   wrap.innerHTML='';
 
+  if(!portalWeek?.rows?.length){
+    wrap.innerHTML='<div class="empty"><div class="empty-icon">📅</div>No schedule built yet for this week.</div>';
+    return;
+  }
+
+  // ── Header stats bar ──
+  const myRow=portalWeek.rows.find(r=>r.name===portalEmpName);
+  const todayName=DAYS.find(d=>{
+    if(!portalWeek.startDate) return false;
+    const dd=new Date(portalWeek.startDate);
+    dd.setDate(dd.getDate()+DAYS.indexOf(d));dd.setHours(0,0,0,0);
+    return dd.getTime()===today.getTime();
+  });
+  const myToday=myRow?.days[todayName]||{};
+  const statsBar=document.createElement('div');
+  statsBar.style.cssText='display:flex;gap:.65rem;flex-wrap:wrap;margin-bottom:1.25rem';
+  const statItems=[
+    {label:'Today',val:todayName||'—',sub:myToday.shift?myToday.shift+(myToday.start?' · '+myToday.start+'–'+myToday.end:''):'No shift',color:'var(--primary)'},
+    {label:'My Task',val:myToday.task&&myToday.task!=='—'?myToday.task:'—',color:'#1a7a6a'},
+    {label:'Team',val:portalWeek.rows.length+' people',color:'var(--blue)'},
+  ];
+  statsBar.innerHTML=statItems.map(s=>`
+    <div style="background:var(--white);border-radius:var(--r);box-shadow:var(--shadow);padding:.75rem 1.1rem;flex:1;min-width:130px">
+      <div style="font-size:.7rem;font-weight:600;color:var(--grey-400);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.25rem">${s.label}</div>
+      <div style="font-size:1rem;font-weight:800;color:${s.color}">${s.val}</div>
+      ${s.sub?`<div style="font-size:.72rem;color:var(--grey-400);margin-top:1px">${s.sub}</div>`:''}
+    </div>`).join('');
+  wrap.appendChild(statsBar);
+
+  // ── Full team table ──
   const outerDiv=document.createElement('div');
   outerDiv.className='sched-outer';
   const tbl=document.createElement('table');
   tbl.className='sched-tbl';
+  tbl.style.minWidth='700px';
 
-  // Header — days as columns
+  // Header
   const thead=tbl.createTHead();
   const hr=thead.insertRow();
   const th0=document.createElement('th');
-  th0.className='name-th';th0.textContent='My Schedule';
+  th0.className='name-th';
+  th0.innerHTML='<span style="color:var(--grey-400)">Employee</span>';
   hr.appendChild(th0);
+
   DAYS.forEach(d=>{
     const th=document.createElement('th');
     th.className='day-th';
-    const ds=portalWeek?.startDate?` <span style="font-size:.56rem;font-weight:400;color:var(--grey-400)">${dayDate(portalWeek.startDate,d)}</span>`:'';
-    // Highlight today
     let isToday=false;
-    if(portalWeek?.startDate){
+    if(portalWeek.startDate){
       const dd=new Date(portalWeek.startDate);
-      dd.setDate(dd.getDate()+DAYS.indexOf(d));
-      dd.setHours(0,0,0,0);
+      dd.setDate(dd.getDate()+DAYS.indexOf(d));dd.setHours(0,0,0,0);
       isToday=dd.getTime()===today.getTime();
     }
-    th.innerHTML=d.slice(0,3)+ds+(isToday?'<br><span style="font-size:.55rem;font-weight:700;color:var(--primary);background:rgba(240,35,60,.1);padding:.08rem .35rem;border-radius:100px">today</span>':'');
-    if(isToday) th.style.background='rgba(240,35,60,.04)';
+    const dateStr=portalWeek.startDate?`<span style="font-size:.56rem;font-weight:400;display:block;color:var(--grey-400)">${dayDate(portalWeek.startDate,d)}</span>`:'';
+    th.innerHTML=d.slice(0,3)+dateStr+(isToday?`<span style="display:inline-block;margin-top:2px;font-size:.55rem;font-weight:700;color:var(--primary);background:rgba(240,35,60,.12);padding:.06rem .4rem;border-radius:100px">today</span>`:'');
+    if(isToday) th.style.cssText='background:rgba(240,35,60,.04);';
     hr.appendChild(th);
   });
 
-  // Single row — this employee
+  // Body — all employees, highlight own row
   const tbody=tbl.createTBody();
-  const tr=tbody.insertRow();
+  portalWeek.rows.forEach(row=>{
+    const isMe=row.name===portalEmpName;
+    const tr=tbody.insertRow();
 
-  // Name cell
-  const td0=tr.insertCell();
-  td0.className='name-td';
-  td0.innerHTML=portalEmpName;
-
-  // Day cells — identical to admin table
-  DAYS.forEach(d=>{
-    const c=row?.days[d]||{shift:'',start:'',end:'',task:'—'};
-    const td=tr.insertCell();
-
-    // Today highlight
-    let isToday=false;
-    if(portalWeek?.startDate){
-      const dd=new Date(portalWeek.startDate);
-      dd.setDate(dd.getDate()+DAYS.indexOf(d));
-      dd.setHours(0,0,0,0);
-      isToday=dd.getTime()===today.getTime();
+    // Name cell
+    const td0=tr.insertCell();
+    td0.className='name-td';
+    if(isMe){
+      td0.style.cssText='background:rgba(240,35,60,.05);border-right:3px solid var(--primary);';
+      td0.innerHTML=`<span style="font-weight:800;color:var(--primary)">${row.name}</span><div style="font-size:.62rem;font-weight:600;color:var(--primary);opacity:.7">You</div>`;
+    } else {
+      td0.innerHTML=`<span style="font-weight:600">${row.name}</span>`;
     }
 
-    const div=document.createElement('div');
-    const bg=SHIFT_BG[c.shift]||'c-empty';
-    div.className=`cell ${bg}`;
-    if(isToday) td.style.background='rgba(240,35,60,.03)';
+    DAYS.forEach(d=>{
+      const c=row.days[d]||{shift:'',start:'',end:'',task:'—'};
+      const td=tr.insertCell();
 
-    const lc=SHIFT_LC[c.shift]||'';
-    const shift=c.shift||'';
-    const timeStr=c.start&&c.end?`${c.start}–${c.end}`:'';
-    const isOff=shift==='OFF'||shift==='Paid'||shift==='Leave';
-    const tlc=TASK_LC[c.task]||'';
+      let isToday=false;
+      if(portalWeek.startDate){
+        const dd=new Date(portalWeek.startDate);
+        dd.setDate(dd.getDate()+DAYS.indexOf(d));dd.setHours(0,0,0,0);
+        isToday=dd.getTime()===today.getTime();
+      }
+      if(isMe) td.style.background='rgba(240,35,60,.03)';
+      else if(isToday) td.style.background='rgba(240,35,60,.02)';
 
-    div.innerHTML=`<span class="c-shift ${lc}">${shift||'—'}</span>
-      ${timeStr?`<span class="c-times">${timeStr}</span>`:''}
-      ${!isOff&&c.task&&c.task!=='—'?`<span class="c-task ${tlc}">${c.task}</span>`:''}
-      ${c.note?`<span class="c-note">${c.note}</span>`:''}`;
+      const div=document.createElement('div');
+      const bg=SHIFT_BG[c.shift]||'c-empty';
+      div.className=`cell ${bg}`;
 
-    td.appendChild(div);
+      const lc=SHIFT_LC[c.shift]||'';
+      const shift=c.shift||'';
+      const timeStr=c.start&&c.end?`${c.start}–${c.end}`:'';
+      const isOff=shift==='OFF'||shift==='Paid'||shift==='Leave';
+      const tlc=TASK_LC[c.task]||'';
+
+      div.innerHTML=`<span class="c-shift ${lc}">${shift||'—'}</span>
+        ${timeStr?`<span class="c-times">${timeStr}</span>`:''}
+        ${!isOff&&c.task&&c.task!=='—'?`<span class="c-task ${tlc}">${c.task}</span>`:''}`;
+      td.appendChild(div);
+    });
   });
 
+  tbl.appendChild(tbody);
   outerDiv.appendChild(tbl);
   wrap.appendChild(outerDiv);
 
   // Legend
   const legend=document.createElement('div');
   legend.style.cssText='display:flex;gap:.75rem;flex-wrap:wrap;margin-top:.75rem;font-size:.72rem;font-weight:600;align-items:center;color:var(--grey-400)';
-  legend.innerHTML=`<span style="color:#1a7a6a">● AM</span><span style="color:#3a7a1a">● PM</span><span style="color:#a05a00">● Mid</span><span style="color:var(--red)">● OFF</span><span style="color:#1a7a6a">● Calls</span><span style="color:#3a7a1a">● Zendesk</span><span style="color:#2563eb">● Emails</span>`;
+  legend.innerHTML='<span style="color:#1a7a6a">● AM</span><span style="color:#3a7a1a">● PM</span><span style="color:#a05a00">● Mid</span><span style="color:var(--red)">● OFF</span><span style="color:#1a7a6a">● Calls</span><span style="color:#3a7a1a">● Zendesk</span><span style="color:#2563eb">● Emails</span>';
   wrap.appendChild(legend);
 }
 
