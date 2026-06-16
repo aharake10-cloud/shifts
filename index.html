@@ -1307,8 +1307,9 @@ function buildSchedTable(tblId, week, editable){
   (week.rows||[]).forEach(row=>{
     const tr=tbody.insertRow();
     const td0=tr.insertCell();td0.className='name-td';
-    const req=approvedMap[row.name];
-    td0.innerHTML=row.name+(req?.dayOff?`<div class="sub">off: ${req.dayOff}</div>`:'');
+    // Find actual day off from the schedule (OFF cell), not from request
+    const actualOffDay=DAYS.find(d=>row.days[d]?.shift==='OFF');
+    td0.innerHTML=row.name+(actualOffDay?`<div class="sub">off: ${actualOffDay}</div>`:'');
 
     DAYS.forEach(d=>{
       const c=row.days[d]||{shift:'',start:'',end:'',task:'—'};
@@ -1901,11 +1902,17 @@ async function loadPortalRequest(){
     const snap=await _db.collection('requests').where('employeeName','==',portalEmpName).get();
     snap.forEach(d=>{
       const data={id:d.id,...d.data()};
-      const key=data.weekId||'default';
-      if(!myRequests[key]||(data.updatedAt||data.createdAt||0)>(myRequests[key].updatedAt||myRequests[key].createdAt||0))
+      // Key by weekId — skip requests with no weekId (old format) unless it's the only one
+      const key=data.weekId||('legacy-'+d.id); // unique key per legacy request
+      const existing=myRequests[key];
+      // Keep the most recently updated one per week
+      if(!existing||(data.updatedAt||data.createdAt||0)>(existing.updatedAt||existing.createdAt||0)){
         myRequests[key]=data;
+      }
     });
-    const all=Object.values(myRequests).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+    const all=Object.values(myRequests)
+      .filter(r=>r.weekId) // only show requests tied to a specific week
+      .sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
     if(all.length) myExistingRequest=all[0];
     renderMyRequest();
   }catch(e){ console.error('loadPortalRequest:',e.message); }
@@ -2032,14 +2039,26 @@ function renderMyRequest(){
   const existing=el('portal-existing-req');
   if(!existing) return;
 
-  // Get all requests sorted newest first
-  const allReqs=Object.values(myRequests)
-    .filter(r=>r.dayOff) // only real ones
+  const today=new Date();today.setHours(0,0,0,0);
+
+  // Only show requests for current or future weeks
+  const relevantReqs=Object.values(myRequests)
+    .filter(r=>{
+      if(!r.weekId||!r.dayOff) return false; // must have weekId and dayOff
+      // Find the week to check its dates
+      const week=availableWeeks.find(w=>w.id===r.weekId);
+      if(!week) return true; // week not loaded yet — show anyway
+      if(week.endDate){
+        const e=new Date(week.endDate);e.setHours(23,59,59,999);
+        return e>=today; // only current or future weeks
+      }
+      return true;
+    })
     .sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
 
-  if(!allReqs.length){ existing.style.display='none'; return; }
+  if(!relevantReqs.length){existing.style.display='none';return;}
 
-  existing.innerHTML=allReqs.map(r=>{
+  existing.innerHTML=relevantReqs.map(r=>{
     const statusClr=r.status==='approved'?'var(--success)':r.status==='rejected'?'var(--red)':'var(--amber)';
     const statusTxt=r.status==='approved'?'✓ Approved':r.status==='rejected'?'✗ Rejected':'⏳ Pending';
     return `<div style="background:var(--white);border-radius:var(--r);box-shadow:var(--shadow);padding:1rem 1.25rem;margin-bottom:.65rem;border-left:3px solid ${statusClr}">
@@ -2142,11 +2161,12 @@ function renderPortalDays(){
     const td0=tr.insertCell();
     td0.className='name-td';
     td0.style.cssText='padding:.35rem .5rem;font-size:.72rem;width:110px;min-width:110px;';
+    const actualOff=DAYS.find(d=>row.days[d]?.shift==='OFF');
     if(isMe){
       td0.style.cssText+='background:rgba(240,35,60,.05);border-right:3px solid var(--primary);';
-      td0.innerHTML=`<span style="font-weight:800;color:var(--primary);font-size:.75rem">${row.name}</span><div style="font-size:.58rem;font-weight:600;color:var(--primary);opacity:.7">You</div>`;
+      td0.innerHTML=`<span style="font-weight:800;color:var(--primary);font-size:.75rem">${row.name}</span>${actualOff?`<div style="font-size:.58rem;font-weight:600;color:var(--primary);opacity:.7">off: ${actualOff}</div>`:''}`;
     } else {
-      td0.innerHTML=`<span style="font-weight:600;font-size:.75rem">${row.name}</span>`;
+      td0.innerHTML=`<span style="font-weight:600;font-size:.75rem">${row.name}</span>${actualOff?`<div style="font-size:.6rem;color:var(--grey-400)">off: ${actualOff}</div>`:''}`;
     }
 
     DAYS.forEach(d=>{
@@ -2299,11 +2319,10 @@ async function submitPortalRequest(){
 function buildPswWeekSelector(){
   const sel=el('psw-week');
   if(!sel) return;
-  // Show current week + any future weeks (same logic as request week)
   const today=new Date();today.setHours(0,0,0,0);
   const allW=[...availableWeeks].sort((a,b)=>(a.createdAt||0)-(b.createdAt||0));
 
-  // Current week = published week containing today
+  // Current week = any published week whose date range includes today OR started before today and hasn't ended
   const currentW=allW.find(w=>{
     if(!w.startDate||!w.endDate) return false;
     const s=new Date(w.startDate);s.setHours(0,0,0,0);
@@ -2311,11 +2330,14 @@ function buildPswWeekSelector(){
     return today>=s&&today<=e;
   });
 
-  // Show current + future weeks
+  // Show: current week + any week that hasn't ended yet + weeks with no dates
   const switchable=allW.filter(w=>{
-    if(!w.startDate) return true;
-    const s=new Date(w.startDate);s.setHours(0,0,0,0);
-    return s>=today; // current week or future
+    if(!w.startDate&&!w.endDate) return true; // no dates = always show
+    if(w.endDate){
+      const e=new Date(w.endDate);e.setHours(23,59,59,999);
+      return e>=today; // include if week hasn't fully ended
+    }
+    return true;
   });
 
   if(!switchable.length){
@@ -2331,11 +2353,8 @@ function buildPswWeekSelector(){
       return '<option value="'+w.id+'">'+w.label+range+isCur+'</option>';
     }).join('');
 
-  // Auto-select current week if exists
-  if(currentW){
-    sel.value=currentW.id;
-    onSwitchWeekSelected();
-  }
+  // Auto-select current week
+  if(currentW){sel.value=currentW.id;onSwitchWeekSelected();}
   sel.onchange=onSwitchWeekSelected;
 }
 
