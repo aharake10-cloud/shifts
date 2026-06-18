@@ -543,17 +543,16 @@ details.card>summary::-webkit-details-marker{display:none;}
       <!-- Report content -->
       <div id="analytics-report" style="display:none">
 
-        <!-- Week selector for the report -->
+        <!-- Month selector -->
         <div class="week-bar" style="margin-bottom:1.25rem">
-          <span class="wk-lbl">Group by:</span>
-          <button class="fbtn active" id="agrp-week" data-agrp="week">Week</button>
-          <button class="fbtn" id="agrp-day" data-agrp="day">Day</button>
+          <span class="wk-lbl">Month:</span>
+          <input type="month" id="analytics-month" style="height:30px;font-size:.78rem;padding:0 .6rem;border-radius:100px;border:1.5px solid var(--grey-200);background:var(--white);color:var(--grey-900);cursor:pointer">
           <span style="margin-left:auto;font-size:.78rem;color:var(--grey-400)" id="analytics-summary"></span>
         </div>
 
-        <!-- Total tickets per agent per period -->
+        <!-- Monthly totals per agent (the "Total Per Month" table) -->
         <div class="card">
-          <div class="card-title">📋 Tickets Solved Per Agent</div>
+          <div class="card-title">📋 Tickets Solved — Monthly Summary</div>
           <div class="tbl-wrap"><table id="atbl-volume"></table></div>
         </div>
 
@@ -569,11 +568,8 @@ details.card>summary::-webkit-details-marker{display:none;}
           </div>
         </div>
 
-        <!-- Daily breakdown grid (heatmap style) -->
-        <div class="card">
-          <div class="card-title">🗓 Daily Breakdown</div>
-          <div class="tbl-wrap"><table id="atbl-daily"></table></div>
-        </div>
+        <!-- Per-week daily breakdown tables — one card per week, editable boundaries -->
+        <div id="analytics-weekly-tables"></div>
 
       </div>
     </div>
@@ -1591,10 +1587,10 @@ async function assignTasksAndSave(){
 // EXCEL EXPORT
 // ══════════════════════════════════════
 // ══════════════════════════════════════
-// ANALYTICS — Zendesk ticket report
+// ANALYTICS — Zendesk ticket report (month + auto-week breakdown)
 // ══════════════════════════════════════
-let analyticsRaw=[];     // raw parsed rows: {ticketId, assignee, solvedDate, rating}
-let analyticsGroupBy='week'; // 'week' | 'day'
+let analyticsRaw=[];        // raw parsed rows: {ticketId, assignee, solvedDate, rating}
+let analyticsMonth='';      // 'YYYY-MM'
 
 function handleAnalyticsFile(file){
   const errEl=el('analytics-upload-err');
@@ -1609,10 +1605,8 @@ function handleAnalyticsFile(file){
       const wb=XLSX.read(data,{type:'array',cellDates:true});
       const sheet=wb.Sheets[wb.SheetNames[0]];
       const rows=XLSX.utils.sheet_to_json(sheet,{defval:null});
-
       if(!rows.length) throw new Error('File is empty.');
 
-      // Auto-detect column names (case-insensitive, flexible matching)
       const sample=rows[0];
       const keys=Object.keys(sample);
       const findKey=(patterns)=>keys.find(k=>patterns.some(p=>k.toLowerCase().replace(/[\s_-]/g,'').includes(p)));
@@ -1626,9 +1620,8 @@ function handleAnalyticsFile(file){
 
       analyticsRaw=rows.map(r=>{
         let solvedDate=r[kSolved];
-        // Normalize date — could be Date object, string, or Excel serial number
         if(solvedDate instanceof Date){
-          // keep as Date
+          // keep
         } else if(typeof solvedDate==='number'){
           solvedDate=new Date((solvedDate-25569)*86400*1000);
         } else if(typeof solvedDate==='string'&&solvedDate.trim()){
@@ -1645,9 +1638,21 @@ function handleAnalyticsFile(file){
           solvedDate,
           rating
         };
-      }).filter(r=>r.assignee); // must have an assignee
+      }).filter(r=>r.assignee);
 
       if(!analyticsRaw.length) throw new Error('No valid rows found after parsing.');
+
+      // Auto-detect month from data (most common month in solved dates)
+      const monthCounts={};
+      analyticsRaw.forEach(r=>{
+        if(r.solvedDate){
+          const mk=r.solvedDate.getFullYear()+'-'+String(r.solvedDate.getMonth()+1).padStart(2,'0');
+          monthCounts[mk]=(monthCounts[mk]||0)+1;
+        }
+      });
+      const topMonth=Object.entries(monthCounts).sort((a,b)=>b[1]-a[1])[0];
+      analyticsMonth=topMonth?topMonth[0]:new Date().toISOString().slice(0,7);
+      el('analytics-month').value=analyticsMonth;
 
       el('analytics-loading').style.display='none';
       el('analytics-report').style.display='block';
@@ -1680,120 +1685,158 @@ function resetAnalytics(){
   el('analytics-file-input').value='';
 }
 
-function setAnalyticsGroup(mode){
-  analyticsGroupBy=mode;
-  el('agrp-week').classList.toggle('active',mode==='week');
-  el('agrp-day').classList.toggle('active',mode==='day');
+function onAnalyticsMonthChange(){
+  analyticsMonth=el('analytics-month').value;
   renderAnalyticsReport();
 }
 
-// ── Helpers to bucket dates ──
-function getWeekKey(date){
-  // ISO week: Monday-based, label like "Week of Jun 8"
+// ── Build week definitions for a given month: Week 1-4 = 7 days each, Week 5 = leftover (3-4 days) ──
+function buildMonthWeeks(monthKey){
+  const [y,m]=monthKey.split('-').map(Number);
+  const daysInMonth=new Date(y,m,0).getDate(); // m is 1-indexed here, Date() takes 0 for "last day of prev month" trick
+  const weeks=[];
+  let dayCursor=1;
+  let weekNum=1;
+  while(dayCursor<=daysInMonth){
+    const remaining=daysInMonth-dayCursor+1;
+    // Weeks 1-4 are fixed 7 days; if remaining <=7 and weekNum<=4, this is the last full/partial week
+    let len;
+    if(weekNum<=4 && remaining>7){
+      len=7;
+    } else if(weekNum<=4 && remaining<=7){
+      len=remaining; // last week absorbs naturally if month is exactly 28 days
+    } else {
+      len=remaining; // week 5 = leftover days (3-4 typically)
+    }
+    const startDay=dayCursor;
+    const endDay=Math.min(dayCursor+len-1,daysInMonth);
+    weeks.push({
+      weekNum,
+      label:'Week '+weekNum,
+      startDate:new Date(y,m-1,startDay),
+      endDate:new Date(y,m-1,endDay),
+    });
+    dayCursor=endDay+1;
+    weekNum++;
+  }
+  return weeks;
+}
+
+function dayKeyOf(date){
   const d=new Date(date);
-  const day=d.getDay(); // 0=Sun
-  const diffToMon=(day===0?-6:1)-day;
-  const monday=new Date(d);monday.setDate(d.getDate()+diffToMon);
-  monday.setHours(0,0,0,0);
-  return monday.toISOString().slice(0,10); // YYYY-MM-DD of the Monday
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 }
-function getWeekLabel(mondayKey){
-  const d=new Date(mondayKey);
-  return 'Week of '+d.toLocaleDateString('en-GB',{day:'numeric',month:'short'});
-}
-function getDayKey(date){
-  return new Date(date).toISOString().slice(0,10);
-}
-function getDayLabel(dayKey){
-  const d=new Date(dayKey);
-  return d.toLocaleDateString('en-GB',{day:'numeric',month:'short',weekday:'short'});
+function fmtShortDate(date){
+  return new Date(date).toLocaleDateString('en-GB',{day:'numeric',month:'short'});
 }
 
 function isGoodRating(r){
   if(r==null) return false;
   const s=String(r).toLowerCase();
-  return s.includes('good')||s.includes('satisf')||s==='1'||s==='positive'||s==='5'||s==='4'||s==='thumb_up'||s==='thumbsup';
+  return s.includes('good')||s.includes('satisf')||s==='positive'||s==='5'||s==='4'||s==='thumb_up'||s==='thumbsup';
 }
 function isBadRating(r){
   if(r==null) return false;
   const s=String(r).toLowerCase();
-  return s.includes('bad')||s.includes('unsatisf')||s.includes('dissatisf')||s==='0'||s==='negative'||s==='1'||s==='2'||s==='thumb_down'||s==='thumbsdown';
+  return s.includes('bad')||s.includes('unsatisf')||s.includes('dissatisf')||s==='negative'||s==='1'||s==='2'||s==='thumb_down'||s==='thumbsdown';
 }
 
 function renderAnalyticsReport(){
-  if(!analyticsRaw.length) return;
+  if(!analyticsRaw.length||!analyticsMonth) return;
 
-  const validRows=analyticsRaw.filter(r=>r.solvedDate); // only solved tickets count for volume
-  const agents=[...new Set(analyticsRaw.map(r=>r.assignee))].sort();
+  // Employee columns = ShiftFlow employee list (not from file)
+  const agents=emps.map(e=>e.name).sort();
+  if(!agents.length){
+    el('analytics-summary').textContent='No employees found — add employees first.';
+    return;
+  }
 
-  // Build period keys
-  const keyFn=analyticsGroupBy==='week'?getWeekKey:getDayKey;
-  const labelFn=analyticsGroupBy==='week'?getWeekLabel:getDayLabel;
+  const weeks=buildMonthWeeks(analyticsMonth);
+  const validRows=analyticsRaw.filter(r=>r.solvedDate);
 
-  const periodSet=new Set();
-  validRows.forEach(r=>periodSet.add(keyFn(r.solvedDate)));
-  const periods=[...periodSet].sort();
+  // Filter rows to only the selected month
+  const [my,mm]=analyticsMonth.split('-').map(Number);
+  const monthRows=validRows.filter(r=>r.solvedDate.getFullYear()===my&&(r.solvedDate.getMonth()+1)===mm);
 
-  // ── 1. Volume table: tickets solved per agent per period ──
-  const volMap={}; // {period: {agent: count}}
-  periods.forEach(p=>{volMap[p]={};agents.forEach(a=>volMap[p][a]=0);});
-  validRows.forEach(r=>{
-    const p=keyFn(r.solvedDate);
-    if(volMap[p]) volMap[p][r.assignee]=(volMap[p][r.assignee]||0)+1;
+  // ── Monthly summary table: rows = Week 1..5, cols = agents, + Total Per Month row ──
+  const volByWeek={};
+  weeks.forEach(w=>{volByWeek[w.label]={};agents.forEach(a=>volByWeek[w.label][a]=0);});
+  monthRows.forEach(r=>{
+    const dk=dayKeyOf(r.solvedDate);
+    const week=weeks.find(w=>dayKeyOf(w.startDate)<=dk&&dk<=dayKeyOf(w.endDate));
+    if(week&&volByWeek[week.label][r.assignee]!==undefined) volByWeek[week.label][r.assignee]++;
   });
+  renderMonthlySummary('atbl-volume',weeks,agents,volByWeek,'Total Per Month','');
 
-  renderAnalyticsTable('atbl-volume',periods,agents,volMap,labelFn,'');
-
-  // ── 2. Good ratings per agent per period ──
-  const goodMap={};periods.forEach(p=>{goodMap[p]={};agents.forEach(a=>goodMap[p][a]=0);});
-  analyticsRaw.forEach(r=>{
-    if(!r.solvedDate||!isGoodRating(r.rating)) return;
-    const p=keyFn(r.solvedDate);
-    if(goodMap[p]) goodMap[p][r.assignee]=(goodMap[p][r.assignee]||0)+1;
+  // ── Good ratings monthly summary ──
+  const goodByWeek={};
+  weeks.forEach(w=>{goodByWeek[w.label]={};agents.forEach(a=>goodByWeek[w.label][a]=0);});
+  monthRows.forEach(r=>{
+    if(!isGoodRating(r.rating)) return;
+    const dk=dayKeyOf(r.solvedDate);
+    const week=weeks.find(w=>dayKeyOf(w.startDate)<=dk&&dk<=dayKeyOf(w.endDate));
+    if(week&&goodByWeek[week.label][r.assignee]!==undefined) goodByWeek[week.label][r.assignee]++;
   });
-  renderAnalyticsTable('atbl-good',periods,agents,goodMap,labelFn,'atbl-good');
+  renderMonthlySummary('atbl-good',weeks,agents,goodByWeek,'Total Good Ratings','atbl-good');
 
-  // ── 3. Bad ratings per agent per period ──
-  const badMap={};periods.forEach(p=>{badMap[p]={};agents.forEach(a=>badMap[p][a]=0);});
-  analyticsRaw.forEach(r=>{
-    if(!r.solvedDate||!isBadRating(r.rating)) return;
-    const p=keyFn(r.solvedDate);
-    if(badMap[p]) badMap[p][r.assignee]=(badMap[p][r.assignee]||0)+1;
+  // ── Bad ratings monthly summary ──
+  const badByWeek={};
+  weeks.forEach(w=>{badByWeek[w.label]={};agents.forEach(a=>badByWeek[w.label][a]=0);});
+  monthRows.forEach(r=>{
+    if(!isBadRating(r.rating)) return;
+    const dk=dayKeyOf(r.solvedDate);
+    const week=weeks.find(w=>dayKeyOf(w.startDate)<=dk&&dk<=dayKeyOf(w.endDate));
+    if(week&&badByWeek[week.label][r.assignee]!==undefined) badByWeek[week.label][r.assignee]++;
   });
-  renderAnalyticsTable('atbl-bad',periods,agents,badMap,labelFn,'atbl-bad');
+  renderMonthlySummary('atbl-bad',weeks,agents,badByWeek,'Total Bad Ratings','atbl-bad');
 
-  // ── 4. Daily breakdown — always by day regardless of group toggle ──
-  const dayKeys=[...new Set(validRows.map(r=>getDayKey(r.solvedDate)))].sort();
-  const dayMap={};dayKeys.forEach(d=>{dayMap[d]={};agents.forEach(a=>dayMap[d][a]=0);});
-  validRows.forEach(r=>{
-    const d=getDayKey(r.solvedDate);
-    dayMap[d][r.assignee]=(dayMap[d][r.assignee]||0)+1;
+  // ── Per-week daily breakdown tables (one card per week) ──
+  const weeklyWrap=el('analytics-weekly-tables');
+  weeklyWrap.innerHTML='';
+  weeks.forEach(week=>{
+    const dayKeys=[];
+    let cur=new Date(week.startDate);
+    while(cur<=week.endDate){dayKeys.push(dayKeyOf(cur));cur.setDate(cur.getDate()+1);}
+
+    const dayMap={};
+    dayKeys.forEach(dk=>{dayMap[dk]={};agents.forEach(a=>dayMap[dk][a]=0);});
+    monthRows.forEach(r=>{
+      const dk=dayKeyOf(r.solvedDate);
+      if(dayMap[dk]&&dayMap[dk][r.assignee]!==undefined) dayMap[dk][r.assignee]++;
+    });
+
+    const card=document.createElement('div');
+    card.className='card';
+    const rangeStr=fmtShortDate(week.startDate)+' – '+fmtShortDate(week.endDate);
+    card.innerHTML=`<div class="card-title">🗓 ${week.label} <span style="font-weight:400;color:var(--grey-400);font-size:.78rem;margin-left:.4rem">${rangeStr}</span></div>
+      <div class="tbl-wrap"><table id="atbl-daily-${week.weekNum}"></table></div>`;
+    weeklyWrap.appendChild(card);
+
+    renderDailyHeatmap('atbl-daily-'+week.weekNum,dayKeys,agents,dayMap);
   });
-  renderDailyHeatmap('atbl-daily',dayKeys,agents,dayMap);
 
   // Summary line
-  const totalTickets=validRows.length;
-  const dateRange=dayKeys.length?getDayLabel(dayKeys[0])+' – '+getDayLabel(dayKeys[dayKeys.length-1]):'';
-  el('analytics-summary').textContent=`${totalTickets} tickets · ${agents.length} agents · ${dateRange}`;
+  const totalTickets=monthRows.length;
+  const monthLabel=new Date(my,mm-1,1).toLocaleDateString('en-GB',{month:'long',year:'numeric'});
+  el('analytics-summary').textContent=`${totalTickets} tickets · ${agents.length} agents · ${monthLabel}`;
 }
 
-function renderAnalyticsTable(tblId,periods,agents,dataMap,labelFn,extraClass){
+function renderMonthlySummary(tblId,weeks,agents,dataMap,totalLabel,extraClass){
   const tbl=el(tblId);
   tbl.className='atbl'+(extraClass?' '+extraClass:'');
-  let html='<thead><tr><th class="row-hdr">Period</th>'+agents.map(a=>`<th>${a}</th>`).join('')+'</tr></thead><tbody>';
+  let html='<thead><tr><th class="row-hdr"></th>'+agents.map(a=>`<th>${a}</th>`).join('')+'</tr></thead><tbody>';
 
   const totals={};agents.forEach(a=>totals[a]=0);
-  periods.forEach(p=>{
-    html+=`<tr><td class="row-label">${labelFn(p)}</td>`;
+  weeks.forEach(w=>{
+    html+=`<tr><td class="row-label">${w.label}</td>`;
     agents.forEach(a=>{
-      const v=dataMap[p][a]||0;
+      const v=dataMap[w.label][a]||0;
       totals[a]+=v;
-      html+=`<td>${v||'—'}</td>`;
+      html+=`<td>${v||''}</td>`;
     });
     html+='</tr>';
   });
-  // Total row
-  html+=`<tr class="total-row"><td class="row-label">Total</td>`;
+  html+=`<tr class="total-row"><td class="row-label">${totalLabel}</td>`;
   agents.forEach(a=>{html+=`<td>${totals[a]}</td>`;});
   html+='</tr></tbody>';
   tbl.innerHTML=html;
@@ -1801,19 +1844,20 @@ function renderAnalyticsTable(tblId,periods,agents,dataMap,labelFn,extraClass){
 
 function renderDailyHeatmap(tblId,dayKeys,agents,dayMap){
   const tbl=el(tblId);
+  if(!tbl) return;
   tbl.className='atbl';
-  // Color scale per agent column — find max for relative coloring
   const colMax={};agents.forEach(a=>{colMax[a]=Math.max(1,...dayKeys.map(d=>dayMap[d][a]||0));});
 
   let html='<thead><tr><th class="row-hdr">Date</th>'+agents.map(a=>`<th>${a}</th>`).join('')+'<th>Total</th></tr></thead><tbody>';
   const colTotals={};agents.forEach(a=>colTotals[a]=0);
   let grandTotal=0;
 
-  dayKeys.forEach(d=>{
+  dayKeys.forEach(dk=>{
     let rowTotal=0;
-    html+=`<tr><td class="row-label">${getDayLabel(d)}</td>`;
+    const dLabel=new Date(dk).toLocaleDateString('en-GB',{day:'numeric',month:'short',weekday:'short'});
+    html+=`<tr><td class="row-label">${dLabel}</td>`;
     agents.forEach(a=>{
-      const v=dayMap[d][a]||0;
+      const v=dayMap[dk][a]||0;
       rowTotal+=v;colTotals[a]+=v;
       const intensity=v/colMax[a];
       const bg=v===0?'transparent':`rgba(240,35,60,${(0.06+intensity*0.22).toFixed(2)})`;
@@ -1834,39 +1878,58 @@ function exportAnalyticsExcel(){
   if(!analyticsRaw.length){toast('No data to export','err');return;}
   if(typeof XLSX==='undefined'){toast('XLSX not loaded','err');return;}
 
-  const wb=XLSX.utils.book_new();
-  const validRows=analyticsRaw.filter(r=>r.solvedDate);
-  const agents=[...new Set(analyticsRaw.map(r=>r.assignee))].sort();
-  const keyFn=analyticsGroupBy==='week'?getWeekKey:getDayKey;
-  const labelFn=analyticsGroupBy==='week'?getWeekLabel:getDayLabel;
-  const periods=[...new Set(validRows.map(r=>keyFn(r.solvedDate)))].sort();
+  const agents=emps.map(e=>e.name).sort();
+  const weeks=buildMonthWeeks(analyticsMonth);
+  const [my,mm]=analyticsMonth.split('-').map(Number);
+  const monthRows=analyticsRaw.filter(r=>r.solvedDate&&r.solvedDate.getFullYear()===my&&(r.solvedDate.getMonth()+1)===mm);
 
-  function buildSheet(dataMap,title){
-    const aoa=[['Period',...agents]];
+  const wb=XLSX.utils.book_new();
+
+  function buildWeekSheet(filterFn,totalLabel){
+    const aoa=[['',...agents]];
     const totals={};agents.forEach(a=>totals[a]=0);
-    periods.forEach(p=>{
-      const row=[labelFn(p)];
-      agents.forEach(a=>{const v=dataMap[p][a]||0;totals[a]+=v;row.push(v);});
+    weeks.forEach(w=>{
+      const row=[w.label];
+      agents.forEach(a=>{
+        const cnt=monthRows.filter(r=>filterFn(r)&&r.assignee===a&&dayKeyOf(r.solvedDate)>=dayKeyOf(w.startDate)&&dayKeyOf(r.solvedDate)<=dayKeyOf(w.endDate)).length;
+        totals[a]+=cnt;
+        row.push(cnt||'');
+      });
       aoa.push(row);
     });
-    aoa.push(['Total',...agents.map(a=>totals[a])]);
+    aoa.push([totalLabel,...agents.map(a=>totals[a])]);
     return XLSX.utils.aoa_to_sheet(aoa);
   }
 
-  const volMap={};periods.forEach(p=>{volMap[p]={};agents.forEach(a=>volMap[p][a]=0);});
-  validRows.forEach(r=>{const p=keyFn(r.solvedDate);volMap[p][r.assignee]=(volMap[p][r.assignee]||0)+1;});
+  XLSX.utils.book_append_sheet(wb,buildWeekSheet(()=>true,'Total Per Month'),'Tickets Solved');
+  XLSX.utils.book_append_sheet(wb,buildWeekSheet(r=>isGoodRating(r.rating),'Total Good Ratings'),'Good Ratings');
+  XLSX.utils.book_append_sheet(wb,buildWeekSheet(r=>isBadRating(r.rating),'Total Bad Ratings'),'Bad Ratings');
 
-  const goodMap={};periods.forEach(p=>{goodMap[p]={};agents.forEach(a=>goodMap[p][a]=0);});
-  analyticsRaw.forEach(r=>{if(r.solvedDate&&isGoodRating(r.rating)){const p=keyFn(r.solvedDate);goodMap[p][r.assignee]=(goodMap[p][r.assignee]||0)+1;}});
+  // Daily sheets per week
+  weeks.forEach(w=>{
+    const dayKeys=[];
+    let cur=new Date(w.startDate);
+    while(cur<=w.endDate){dayKeys.push(dayKeyOf(cur));cur.setDate(cur.getDate()+1);}
+    const aoa=[['Date',...agents,'Total']];
+    const colTotals={};agents.forEach(a=>colTotals[a]=0);
+    let grand=0;
+    dayKeys.forEach(dk=>{
+      const row=[new Date(dk).toLocaleDateString('en-GB',{day:'numeric',month:'short'})];
+      let rowTotal=0;
+      agents.forEach(a=>{
+        const cnt=monthRows.filter(r=>r.assignee===a&&dayKeyOf(r.solvedDate)===dk).length;
+        colTotals[a]+=cnt;rowTotal+=cnt;
+        row.push(cnt||'');
+      });
+      grand+=rowTotal;
+      row.push(rowTotal);
+      aoa.push(row);
+    });
+    aoa.push(['Total',...agents.map(a=>colTotals[a]),grand]);
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(aoa),w.label);
+  });
 
-  const badMap={};periods.forEach(p=>{badMap[p]={};agents.forEach(a=>badMap[p][a]=0);});
-  analyticsRaw.forEach(r=>{if(r.solvedDate&&isBadRating(r.rating)){const p=keyFn(r.solvedDate);badMap[p][r.assignee]=(badMap[p][r.assignee]||0)+1;}});
-
-  XLSX.utils.book_append_sheet(wb,buildSheet(volMap,'Volume'),'Tickets Solved');
-  XLSX.utils.book_append_sheet(wb,buildSheet(goodMap,'Good'),'Good Ratings');
-  XLSX.utils.book_append_sheet(wb,buildSheet(badMap,'Bad'),'Bad Ratings');
-
-  XLSX.writeFile(wb,'zendesk_report.xlsx');
+  XLSX.writeFile(wb,'zendesk_report_'+analyticsMonth+'.xlsx');
   toast('Excel exported!','ok');
 }
 
@@ -3027,7 +3090,7 @@ window.go=go; window.setView=setView; window.openNewWeekModal=openNewWeekModal;
 window.createWeek=createWeek; window.publishWeek=publishWeek;
 window.assignTasksAndSave=assignTasksAndSave; window.exportExcel=exportExcel;
 window.handleAnalyticsFile=handleAnalyticsFile; window.resetAnalytics=resetAnalytics;
-window.setAnalyticsGroup=setAnalyticsGroup; window.exportAnalyticsExcel=exportAnalyticsExcel;
+window.onAnalyticsMonthChange=onAnalyticsMonthChange; window.exportAnalyticsExcel=exportAnalyticsExcel;
 window.openCellModal=openCellModal; window.saveCell=saveCell; window.clearCell=clearCell;
 window.pickType=pickType; window.loadRequests=loadRequests; window.filterReqs=filterReqs;
 window.appDay=appDay; window.appAll=appAll; window.rejAll=rejAll;
@@ -3072,8 +3135,8 @@ wire('btn-export',       exportExcel);
 wire('btn-analytics-pick',  ()=>el('analytics-file-input').click());
 wire('btn-analytics-clear', resetAnalytics);
 wire('btn-analytics-export',exportAnalyticsExcel);
-wire('agrp-week',  ()=>setAnalyticsGroup('week'));
-wire('agrp-day',   ()=>setAnalyticsGroup('day'));
+const analyticsMonthInput=document.getElementById('analytics-month');
+if(analyticsMonthInput) analyticsMonthInput.addEventListener('change',onAnalyticsMonthChange);
 const analyticsFileInput=document.getElementById('analytics-file-input');
 if(analyticsFileInput){
   analyticsFileInput.addEventListener('change',function(e){
