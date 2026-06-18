@@ -303,6 +303,16 @@ select option{background:var(--white);}
 
 /* ─── TABLES ─── */
 .tbl-wrap{overflow-x:auto;border-radius:var(--r);box-shadow:var(--shadow);}
+/* Analytics tables */
+.atbl{width:100%;border-collapse:collapse;font-size:.82rem;}
+.atbl th{background:var(--grey-50);padding:.55rem .8rem;text-align:center;font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--grey-400);border-bottom:1.5px solid var(--grey-100);white-space:nowrap;}
+.atbl th.row-hdr{text-align:left;background:var(--grey-900);color:#fff;}
+.atbl td{padding:.5rem .8rem;text-align:center;border-bottom:1px solid var(--grey-100);font-weight:600;}
+.atbl td.row-label{text-align:left;font-weight:700;background:var(--grey-50);color:var(--grey-900);}
+.atbl tr.total-row td{background:var(--amber-light);color:var(--amber);font-weight:800;border-top:2px solid var(--amber);}
+.atbl tr.total-row td.row-label{background:var(--amber-light);}
+.atbl-good td:not(.row-label){color:var(--success);}
+.atbl-bad td:not(.row-label){color:var(--red);}
 table{width:100%;border-collapse:collapse;font-size:.85rem;background:var(--white);}
 thead th{background:var(--grey-50);padding:.6rem .9rem;text-align:left;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--grey-400);border-bottom:1.5px solid var(--grey-100);}
 tbody tr{border-bottom:1px solid var(--grey-100);transition:background .12s;}
@@ -373,6 +383,7 @@ details.card>summary::-webkit-details-marker{display:none;}
     <div class="sb-section">Management</div>
     <div class="nav-item" id="nav-requests" data-page="requests"><span class="nav-icon">📋</span>Requests<span id="req-badge" style="display:none" class="nav-badge"></span></div>
     <div class="nav-item" id="nav-coverage" data-page="coverage"><span class="nav-icon">📊</span>Coverage</div>
+    <div class="nav-item" id="nav-analytics" data-page="analytics"><span class="nav-icon">📈</span>Analytics</div>
     <div class="sb-section">Setup</div>
     <div class="nav-item" id="nav-employees" data-page="employees"><span class="nav-icon">👥</span>Employees</div>
     <div class="sb-bottom">
@@ -504,6 +515,67 @@ details.card>summary::-webkit-details-marker{display:none;}
       <div id="cov-wbar"></div>
       <div class="cov-grid" id="cov-grid" style="display:none"></div>
       <div id="cov-empty" class="empty" style="display:none"><div class="empty-icon">📊</div>No schedule data yet.</div>
+    </div>
+
+    <!-- ANALYTICS -->
+    <div class="page" id="page-analytics">
+      <div class="page-hdr">
+        <div><div class="page-title">Analytics</div><div class="page-sub">Upload your Zendesk export to generate the ticket report</div></div>
+        <div class="btn-row">
+          <button class="btn btn-white btn-sm" id="btn-analytics-clear" style="display:none">↻ Upload new file</button>
+          <button class="btn btn-white btn-sm" id="btn-analytics-export" style="display:none">↓ Export Excel</button>
+        </div>
+      </div>
+
+      <!-- Upload zone -->
+      <div id="analytics-upload-zone" class="card" style="text-align:center;padding:3rem 2rem;border:2px dashed var(--grey-200);cursor:pointer">
+        <div style="font-size:2.5rem;margin-bottom:.75rem">📊</div>
+        <div style="font-weight:700;font-size:1rem;color:var(--grey-900);margin-bottom:.35rem">Upload Zendesk Export</div>
+        <div style="font-size:.85rem;color:var(--grey-400);margin-bottom:1.25rem">Excel or CSV file with columns: <strong>Ticket ID, Assignee, Solved Date, Rating</strong></div>
+        <input type="file" id="analytics-file-input" accept=".xlsx,.xls,.csv" style="display:none">
+        <button class="btn btn-green" id="btn-analytics-pick">Choose File</button>
+        <div id="analytics-upload-err" class="ferror" style="display:none;margin-top:1rem;max-width:400px;margin-left:auto;margin-right:auto"></div>
+      </div>
+
+      <!-- Loading -->
+      <div id="analytics-loading" style="display:none;padding:3rem;text-align:center"><div class="spinner"></div></div>
+
+      <!-- Report content -->
+      <div id="analytics-report" style="display:none">
+
+        <!-- Week selector for the report -->
+        <div class="week-bar" style="margin-bottom:1.25rem">
+          <span class="wk-lbl">Group by:</span>
+          <button class="fbtn active" id="agrp-week" data-agrp="week">Week</button>
+          <button class="fbtn" id="agrp-day" data-agrp="day">Day</button>
+          <span style="margin-left:auto;font-size:.78rem;color:var(--grey-400)" id="analytics-summary"></span>
+        </div>
+
+        <!-- Total tickets per agent per period -->
+        <div class="card">
+          <div class="card-title">📋 Tickets Solved Per Agent</div>
+          <div class="tbl-wrap"><table id="atbl-volume"></table></div>
+        </div>
+
+        <!-- Good / Bad satisfaction side by side -->
+        <div class="g2">
+          <div class="card">
+            <div class="card-title" style="color:var(--success)">😊 Good Ratings</div>
+            <div class="tbl-wrap"><table id="atbl-good"></table></div>
+          </div>
+          <div class="card">
+            <div class="card-title" style="color:var(--red)">😞 Bad Ratings</div>
+            <div class="tbl-wrap"><table id="atbl-bad"></table></div>
+          </div>
+        </div>
+
+        <!-- Daily breakdown grid (heatmap style) -->
+        <div class="card">
+          <div class="card-title">🗓 Daily Breakdown</div>
+          <div class="tbl-wrap"><table id="atbl-daily"></table></div>
+        </div>
+
+      </div>
     </div>
 
     <!-- EMPLOYEES -->
@@ -1518,6 +1590,286 @@ async function assignTasksAndSave(){
 // ══════════════════════════════════════
 // EXCEL EXPORT
 // ══════════════════════════════════════
+// ══════════════════════════════════════
+// ANALYTICS — Zendesk ticket report
+// ══════════════════════════════════════
+let analyticsRaw=[];     // raw parsed rows: {ticketId, assignee, solvedDate, rating}
+let analyticsGroupBy='week'; // 'week' | 'day'
+
+function handleAnalyticsFile(file){
+  const errEl=el('analytics-upload-err');
+  errEl.style.display='none';
+  el('analytics-loading').style.display='block';
+  el('analytics-upload-zone').style.display='none';
+
+  const reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      const data=new Uint8Array(e.target.result);
+      const wb=XLSX.read(data,{type:'array',cellDates:true});
+      const sheet=wb.Sheets[wb.SheetNames[0]];
+      const rows=XLSX.utils.sheet_to_json(sheet,{defval:null});
+
+      if(!rows.length) throw new Error('File is empty.');
+
+      // Auto-detect column names (case-insensitive, flexible matching)
+      const sample=rows[0];
+      const keys=Object.keys(sample);
+      const findKey=(patterns)=>keys.find(k=>patterns.some(p=>k.toLowerCase().replace(/[\s_-]/g,'').includes(p)));
+
+      const kTicket=findKey(['ticketid','ticket','id']);
+      const kAssignee=findKey(['assignee','agent']);
+      const kSolved=findKey(['solveddate','solved','solveat','closeddate']);
+      const kRating=findKey(['rating','satisfaction','csat']);
+
+      if(!kAssignee) throw new Error('Could not find an "Assignee" column. Check your file headers.');
+
+      analyticsRaw=rows.map(r=>{
+        let solvedDate=r[kSolved];
+        // Normalize date — could be Date object, string, or Excel serial number
+        if(solvedDate instanceof Date){
+          // keep as Date
+        } else if(typeof solvedDate==='number'){
+          solvedDate=new Date((solvedDate-25569)*86400*1000);
+        } else if(typeof solvedDate==='string'&&solvedDate.trim()){
+          const parsed=new Date(solvedDate);
+          solvedDate=isNaN(parsed.getTime())?null:parsed;
+        } else {
+          solvedDate=null;
+        }
+        let rating=r[kRating];
+        if(typeof rating==='string') rating=rating.trim();
+        return{
+          ticketId:kTicket?r[kTicket]:null,
+          assignee:r[kAssignee]?String(r[kAssignee]).trim():null,
+          solvedDate,
+          rating
+        };
+      }).filter(r=>r.assignee); // must have an assignee
+
+      if(!analyticsRaw.length) throw new Error('No valid rows found after parsing.');
+
+      el('analytics-loading').style.display='none';
+      el('analytics-report').style.display='block';
+      el('btn-analytics-clear').style.display='inline-flex';
+      el('btn-analytics-export').style.display='inline-flex';
+      renderAnalyticsReport();
+
+    }catch(err){
+      el('analytics-loading').style.display='none';
+      el('analytics-upload-zone').style.display='block';
+      errEl.textContent='Error reading file: '+err.message;
+      errEl.style.display='block';
+    }
+  };
+  reader.onerror=function(){
+    el('analytics-loading').style.display='none';
+    el('analytics-upload-zone').style.display='block';
+    errEl.textContent='Could not read the file.';
+    errEl.style.display='block';
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function resetAnalytics(){
+  analyticsRaw=[];
+  el('analytics-report').style.display='none';
+  el('analytics-upload-zone').style.display='block';
+  el('btn-analytics-clear').style.display='none';
+  el('btn-analytics-export').style.display='none';
+  el('analytics-file-input').value='';
+}
+
+function setAnalyticsGroup(mode){
+  analyticsGroupBy=mode;
+  el('agrp-week').classList.toggle('active',mode==='week');
+  el('agrp-day').classList.toggle('active',mode==='day');
+  renderAnalyticsReport();
+}
+
+// ── Helpers to bucket dates ──
+function getWeekKey(date){
+  // ISO week: Monday-based, label like "Week of Jun 8"
+  const d=new Date(date);
+  const day=d.getDay(); // 0=Sun
+  const diffToMon=(day===0?-6:1)-day;
+  const monday=new Date(d);monday.setDate(d.getDate()+diffToMon);
+  monday.setHours(0,0,0,0);
+  return monday.toISOString().slice(0,10); // YYYY-MM-DD of the Monday
+}
+function getWeekLabel(mondayKey){
+  const d=new Date(mondayKey);
+  return 'Week of '+d.toLocaleDateString('en-GB',{day:'numeric',month:'short'});
+}
+function getDayKey(date){
+  return new Date(date).toISOString().slice(0,10);
+}
+function getDayLabel(dayKey){
+  const d=new Date(dayKey);
+  return d.toLocaleDateString('en-GB',{day:'numeric',month:'short',weekday:'short'});
+}
+
+function isGoodRating(r){
+  if(r==null) return false;
+  const s=String(r).toLowerCase();
+  return s.includes('good')||s.includes('satisf')||s==='1'||s==='positive'||s==='5'||s==='4'||s==='thumb_up'||s==='thumbsup';
+}
+function isBadRating(r){
+  if(r==null) return false;
+  const s=String(r).toLowerCase();
+  return s.includes('bad')||s.includes('unsatisf')||s.includes('dissatisf')||s==='0'||s==='negative'||s==='1'||s==='2'||s==='thumb_down'||s==='thumbsdown';
+}
+
+function renderAnalyticsReport(){
+  if(!analyticsRaw.length) return;
+
+  const validRows=analyticsRaw.filter(r=>r.solvedDate); // only solved tickets count for volume
+  const agents=[...new Set(analyticsRaw.map(r=>r.assignee))].sort();
+
+  // Build period keys
+  const keyFn=analyticsGroupBy==='week'?getWeekKey:getDayKey;
+  const labelFn=analyticsGroupBy==='week'?getWeekLabel:getDayLabel;
+
+  const periodSet=new Set();
+  validRows.forEach(r=>periodSet.add(keyFn(r.solvedDate)));
+  const periods=[...periodSet].sort();
+
+  // ── 1. Volume table: tickets solved per agent per period ──
+  const volMap={}; // {period: {agent: count}}
+  periods.forEach(p=>{volMap[p]={};agents.forEach(a=>volMap[p][a]=0);});
+  validRows.forEach(r=>{
+    const p=keyFn(r.solvedDate);
+    if(volMap[p]) volMap[p][r.assignee]=(volMap[p][r.assignee]||0)+1;
+  });
+
+  renderAnalyticsTable('atbl-volume',periods,agents,volMap,labelFn,'');
+
+  // ── 2. Good ratings per agent per period ──
+  const goodMap={};periods.forEach(p=>{goodMap[p]={};agents.forEach(a=>goodMap[p][a]=0);});
+  analyticsRaw.forEach(r=>{
+    if(!r.solvedDate||!isGoodRating(r.rating)) return;
+    const p=keyFn(r.solvedDate);
+    if(goodMap[p]) goodMap[p][r.assignee]=(goodMap[p][r.assignee]||0)+1;
+  });
+  renderAnalyticsTable('atbl-good',periods,agents,goodMap,labelFn,'atbl-good');
+
+  // ── 3. Bad ratings per agent per period ──
+  const badMap={};periods.forEach(p=>{badMap[p]={};agents.forEach(a=>badMap[p][a]=0);});
+  analyticsRaw.forEach(r=>{
+    if(!r.solvedDate||!isBadRating(r.rating)) return;
+    const p=keyFn(r.solvedDate);
+    if(badMap[p]) badMap[p][r.assignee]=(badMap[p][r.assignee]||0)+1;
+  });
+  renderAnalyticsTable('atbl-bad',periods,agents,badMap,labelFn,'atbl-bad');
+
+  // ── 4. Daily breakdown — always by day regardless of group toggle ──
+  const dayKeys=[...new Set(validRows.map(r=>getDayKey(r.solvedDate)))].sort();
+  const dayMap={};dayKeys.forEach(d=>{dayMap[d]={};agents.forEach(a=>dayMap[d][a]=0);});
+  validRows.forEach(r=>{
+    const d=getDayKey(r.solvedDate);
+    dayMap[d][r.assignee]=(dayMap[d][r.assignee]||0)+1;
+  });
+  renderDailyHeatmap('atbl-daily',dayKeys,agents,dayMap);
+
+  // Summary line
+  const totalTickets=validRows.length;
+  const dateRange=dayKeys.length?getDayLabel(dayKeys[0])+' – '+getDayLabel(dayKeys[dayKeys.length-1]):'';
+  el('analytics-summary').textContent=`${totalTickets} tickets · ${agents.length} agents · ${dateRange}`;
+}
+
+function renderAnalyticsTable(tblId,periods,agents,dataMap,labelFn,extraClass){
+  const tbl=el(tblId);
+  tbl.className='atbl'+(extraClass?' '+extraClass:'');
+  let html='<thead><tr><th class="row-hdr">Period</th>'+agents.map(a=>`<th>${a}</th>`).join('')+'</tr></thead><tbody>';
+
+  const totals={};agents.forEach(a=>totals[a]=0);
+  periods.forEach(p=>{
+    html+=`<tr><td class="row-label">${labelFn(p)}</td>`;
+    agents.forEach(a=>{
+      const v=dataMap[p][a]||0;
+      totals[a]+=v;
+      html+=`<td>${v||'—'}</td>`;
+    });
+    html+='</tr>';
+  });
+  // Total row
+  html+=`<tr class="total-row"><td class="row-label">Total</td>`;
+  agents.forEach(a=>{html+=`<td>${totals[a]}</td>`;});
+  html+='</tr></tbody>';
+  tbl.innerHTML=html;
+}
+
+function renderDailyHeatmap(tblId,dayKeys,agents,dayMap){
+  const tbl=el(tblId);
+  tbl.className='atbl';
+  // Color scale per agent column — find max for relative coloring
+  const colMax={};agents.forEach(a=>{colMax[a]=Math.max(1,...dayKeys.map(d=>dayMap[d][a]||0));});
+
+  let html='<thead><tr><th class="row-hdr">Date</th>'+agents.map(a=>`<th>${a}</th>`).join('')+'<th>Total</th></tr></thead><tbody>';
+  const colTotals={};agents.forEach(a=>colTotals[a]=0);
+  let grandTotal=0;
+
+  dayKeys.forEach(d=>{
+    let rowTotal=0;
+    html+=`<tr><td class="row-label">${getDayLabel(d)}</td>`;
+    agents.forEach(a=>{
+      const v=dayMap[d][a]||0;
+      rowTotal+=v;colTotals[a]+=v;
+      const intensity=v/colMax[a];
+      const bg=v===0?'transparent':`rgba(240,35,60,${(0.06+intensity*0.22).toFixed(2)})`;
+      const fontW=v===0?'400':'700';
+      html+=`<td style="background:${bg};font-weight:${fontW};color:${v===0?'var(--grey-400)':'var(--grey-900)'}">${v||'—'}</td>`;
+    });
+    grandTotal+=rowTotal;
+    html+=`<td style="font-weight:800;background:var(--grey-50)">${rowTotal}</td></tr>`;
+  });
+
+  html+=`<tr class="total-row"><td class="row-label">Total</td>`;
+  agents.forEach(a=>{html+=`<td>${colTotals[a]}</td>`;});
+  html+=`<td>${grandTotal}</td></tr></tbody>`;
+  tbl.innerHTML=html;
+}
+
+function exportAnalyticsExcel(){
+  if(!analyticsRaw.length){toast('No data to export','err');return;}
+  if(typeof XLSX==='undefined'){toast('XLSX not loaded','err');return;}
+
+  const wb=XLSX.utils.book_new();
+  const validRows=analyticsRaw.filter(r=>r.solvedDate);
+  const agents=[...new Set(analyticsRaw.map(r=>r.assignee))].sort();
+  const keyFn=analyticsGroupBy==='week'?getWeekKey:getDayKey;
+  const labelFn=analyticsGroupBy==='week'?getWeekLabel:getDayLabel;
+  const periods=[...new Set(validRows.map(r=>keyFn(r.solvedDate)))].sort();
+
+  function buildSheet(dataMap,title){
+    const aoa=[['Period',...agents]];
+    const totals={};agents.forEach(a=>totals[a]=0);
+    periods.forEach(p=>{
+      const row=[labelFn(p)];
+      agents.forEach(a=>{const v=dataMap[p][a]||0;totals[a]+=v;row.push(v);});
+      aoa.push(row);
+    });
+    aoa.push(['Total',...agents.map(a=>totals[a])]);
+    return XLSX.utils.aoa_to_sheet(aoa);
+  }
+
+  const volMap={};periods.forEach(p=>{volMap[p]={};agents.forEach(a=>volMap[p][a]=0);});
+  validRows.forEach(r=>{const p=keyFn(r.solvedDate);volMap[p][r.assignee]=(volMap[p][r.assignee]||0)+1;});
+
+  const goodMap={};periods.forEach(p=>{goodMap[p]={};agents.forEach(a=>goodMap[p][a]=0);});
+  analyticsRaw.forEach(r=>{if(r.solvedDate&&isGoodRating(r.rating)){const p=keyFn(r.solvedDate);goodMap[p][r.assignee]=(goodMap[p][r.assignee]||0)+1;}});
+
+  const badMap={};periods.forEach(p=>{badMap[p]={};agents.forEach(a=>badMap[p][a]=0);});
+  analyticsRaw.forEach(r=>{if(r.solvedDate&&isBadRating(r.rating)){const p=keyFn(r.solvedDate);badMap[p][r.assignee]=(badMap[p][r.assignee]||0)+1;}});
+
+  XLSX.utils.book_append_sheet(wb,buildSheet(volMap,'Volume'),'Tickets Solved');
+  XLSX.utils.book_append_sheet(wb,buildSheet(goodMap,'Good'),'Good Ratings');
+  XLSX.utils.book_append_sheet(wb,buildSheet(badMap,'Bad'),'Bad Ratings');
+
+  XLSX.writeFile(wb,'zendesk_report.xlsx');
+  toast('Excel exported!','ok');
+}
+
 function exportExcel(){
   const week=getWeek(activeWid);if(!week){toast('No schedule','err');return;}
   if(typeof XLSX==='undefined'){toast('XLSX not loaded','err');return;}
@@ -2674,6 +3026,8 @@ window.doLogin=doLogin; window.doRegister=doRegister; window.doLogout=doLogout;
 window.go=go; window.setView=setView; window.openNewWeekModal=openNewWeekModal;
 window.createWeek=createWeek; window.publishWeek=publishWeek;
 window.assignTasksAndSave=assignTasksAndSave; window.exportExcel=exportExcel;
+window.handleAnalyticsFile=handleAnalyticsFile; window.resetAnalytics=resetAnalytics;
+window.setAnalyticsGroup=setAnalyticsGroup; window.exportAnalyticsExcel=exportAnalyticsExcel;
 window.openCellModal=openCellModal; window.saveCell=saveCell; window.clearCell=clearCell;
 window.pickType=pickType; window.loadRequests=loadRequests; window.filterReqs=filterReqs;
 window.appDay=appDay; window.appAll=appAll; window.rejAll=rejAll;
@@ -2713,6 +3067,29 @@ wire('btn-sb-logout',doLogout);
 
 // Schedule
 wire('btn-export',       exportExcel);
+
+// Analytics
+wire('btn-analytics-pick',  ()=>el('analytics-file-input').click());
+wire('btn-analytics-clear', resetAnalytics);
+wire('btn-analytics-export',exportAnalyticsExcel);
+wire('agrp-week',  ()=>setAnalyticsGroup('week'));
+wire('agrp-day',   ()=>setAnalyticsGroup('day'));
+const analyticsFileInput=document.getElementById('analytics-file-input');
+if(analyticsFileInput){
+  analyticsFileInput.addEventListener('change',function(e){
+    if(e.target.files&&e.target.files[0]) handleAnalyticsFile(e.target.files[0]);
+  });
+}
+// Drag and drop on upload zone
+const analyticsZone=document.getElementById('analytics-upload-zone');
+if(analyticsZone){
+  analyticsZone.addEventListener('dragover',e=>{e.preventDefault();analyticsZone.style.borderColor='var(--primary)';});
+  analyticsZone.addEventListener('dragleave',e=>{analyticsZone.style.borderColor='var(--grey-200)';});
+  analyticsZone.addEventListener('drop',e=>{
+    e.preventDefault();analyticsZone.style.borderColor='var(--grey-200)';
+    if(e.dataTransfer.files&&e.dataTransfer.files[0]) handleAnalyticsFile(e.dataTransfer.files[0]);
+  });
+}
 wire('vt-times',         ()=>setView('times'));
 wire('vt-tasks',         ()=>setView('tasks'));
 wire('btn-new-week',     openNewWeekModal);
