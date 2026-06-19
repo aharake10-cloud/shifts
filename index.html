@@ -520,9 +520,9 @@ details.card>summary::-webkit-details-marker{display:none;}
     <!-- ANALYTICS -->
     <div class="page" id="page-analytics">
       <div class="page-hdr">
-        <div><div class="page-title">Analytics</div><div class="page-sub">Upload your Zendesk export to generate the ticket report</div></div>
+        <div><div class="page-title">Analytics</div><div class="page-sub">Upload your weekly ticket review sheet to generate the report</div></div>
         <div class="btn-row">
-          <button class="btn btn-white btn-sm" id="btn-analytics-clear" style="display:none">↻ Upload new file</button>
+          <button class="btn btn-white btn-sm" id="btn-analytics-clear" style="display:none">↻ Upload another week</button>
           <button class="btn btn-white btn-sm" id="btn-analytics-export" style="display:none">↓ Export Excel</button>
         </div>
       </div>
@@ -530,8 +530,12 @@ details.card>summary::-webkit-details-marker{display:none;}
       <!-- Upload zone -->
       <div id="analytics-upload-zone" class="card" style="text-align:center;padding:3rem 2rem;border:2px dashed var(--grey-200);cursor:pointer">
         <div style="font-size:2.5rem;margin-bottom:.75rem">📊</div>
-        <div style="font-weight:700;font-size:1rem;color:var(--grey-900);margin-bottom:.35rem">Upload Zendesk Export</div>
-        <div style="font-size:.85rem;color:var(--grey-400);margin-bottom:1.25rem">Excel or CSV file with columns: <strong>Ticket ID, Assignee, Solved Date, Rating</strong></div>
+        <div style="font-weight:700;font-size:1rem;color:var(--grey-900);margin-bottom:.35rem">Upload Weekly Ticket Sheet</div>
+        <div style="font-size:.85rem;color:var(--grey-400);margin-bottom:1.25rem">Excel file with one block per agent — <strong>Ticket Reference, Comment, Rating</strong> columns (good/bad/advice)</div>
+        <div class="frow" style="max-width:260px;margin:0 auto 1rem">
+          <label style="text-align:left">Week Label</label>
+          <input type="text" id="analytics-week-label" placeholder="e.g. Week 1 (1–7 Jun)">
+        </div>
         <input type="file" id="analytics-file-input" accept=".xlsx,.xls,.csv" style="display:none">
         <button class="btn btn-green" id="btn-analytics-pick">Choose File</button>
         <div id="analytics-upload-err" class="ferror" style="display:none;margin-top:1rem;max-width:400px;margin-left:auto;margin-right:auto"></div>
@@ -543,33 +547,42 @@ details.card>summary::-webkit-details-marker{display:none;}
       <!-- Report content -->
       <div id="analytics-report" style="display:none">
 
-        <!-- Month selector -->
-        <div class="week-bar" style="margin-bottom:1.25rem">
-          <span class="wk-lbl">Month:</span>
-          <input type="month" id="analytics-month" style="height:30px;font-size:.78rem;padding:0 .6rem;border-radius:100px;border:1.5px solid var(--grey-200);background:var(--white);color:var(--grey-900);cursor:pointer">
-          <span style="margin-left:auto;font-size:.78rem;color:var(--grey-400)" id="analytics-summary"></span>
-        </div>
+        <!-- Week selector — switch between uploaded weeks -->
+        <div class="week-bar" style="margin-bottom:1.25rem" id="analytics-week-bar"></div>
 
-        <!-- Monthly totals per agent (the "Total Per Month" table) -->
+        <!-- Per-agent totals for selected week -->
         <div class="card">
-          <div class="card-title">📋 Tickets Solved — Monthly Summary</div>
+          <div class="card-title">📋 Tickets Reviewed Per Agent <span style="font-weight:400;color:var(--grey-400);font-size:.78rem;margin-left:.4rem" id="analytics-summary"></span></div>
           <div class="tbl-wrap"><table id="atbl-volume"></table></div>
         </div>
 
-        <!-- Good / Bad satisfaction side by side -->
-        <div class="g2">
+        <!-- Good / Bad / Advice side by side -->
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem">
           <div class="card">
-            <div class="card-title" style="color:var(--success)">😊 Good Ratings</div>
+            <div class="card-title" style="color:var(--success)">😊 Good</div>
             <div class="tbl-wrap"><table id="atbl-good"></table></div>
           </div>
           <div class="card">
-            <div class="card-title" style="color:var(--red)">😞 Bad Ratings</div>
+            <div class="card-title" style="color:var(--red)">😞 Bad</div>
             <div class="tbl-wrap"><table id="atbl-bad"></table></div>
+          </div>
+          <div class="card">
+            <div class="card-title" style="color:var(--amber)">💡 Advice</div>
+            <div class="tbl-wrap"><table id="atbl-advice"></table></div>
           </div>
         </div>
 
-        <!-- Per-week daily breakdown tables — one card per week, editable boundaries -->
-        <div id="analytics-weekly-tables"></div>
+        <!-- Detailed ticket list per agent (expandable) -->
+        <div class="card">
+          <div class="card-title">🎫 Flagged Tickets <span style="font-weight:400;color:var(--grey-400);font-size:.78rem;margin-left:.4rem">bad &amp; advice comments only</span></div>
+          <div id="analytics-flagged-list"></div>
+        </div>
+
+        <!-- Month comparison across all uploaded weeks -->
+        <div class="card" id="analytics-trend-card" style="display:none">
+          <div class="card-title">📈 Trend Across Weeks</div>
+          <div class="tbl-wrap"><table id="atbl-trend"></table></div>
+        </div>
 
       </div>
     </div>
@@ -874,7 +887,7 @@ const TCLS={Calls:'b-calls',Zendesk:'b-zendesk',Emails:'b-emails'};
 const SHIFT_BG={AM:'c-am',PM:'c-pm',Mid:'c-mid',OFF:'c-off',Paid:'c-paid',Leave:'c-leave'};
 const SHIFT_LC={AM:'lc-am',PM:'lc-pm',Mid:'lc-mid',OFF:'lc-off',Paid:'lc-paid',Leave:'lc-leave'};
 const TASK_LC={Calls:'lc-calls',Zendesk:'lc-zendesk',Emails:'lc-emails'};
-const DEF={AM:{s:'08:00',e:'15:30'},PM:{s:'15:30',e:'23:00'},Mid:{s:'12:00',e:'19:30'},OFF:{s:'',e:''},Paid:{s:'',e:''},Leave:{s:'',e:''}};
+const DEF={AM:{s:'08:00',e:'15:30'},PM:{s:'15:00',e:'23:00'},Mid:{s:'12:00',e:'19:30'},OFF:{s:'',e:''},Paid:{s:'',e:''},Leave:{s:'',e:''}};
 
 let fb,db,auth;
 let emps=[];
@@ -951,6 +964,7 @@ async function boot(){
   renderWeekBars();
   renderSchedule();
   renderBuild();
+  loadAnalyticsFromFirestore();
   // ── Real-time listeners ──
   startRealtimeListeners();
 }
@@ -1587,14 +1601,76 @@ async function assignTasksAndSave(){
 // EXCEL EXPORT
 // ══════════════════════════════════════
 // ══════════════════════════════════════
-// ANALYTICS — Zendesk ticket report (month + auto-week breakdown)
+// ANALYTICS — weekly per-agent ticket review sheet
+// Format: one block per agent (name header row, then
+// Ticket Reference | Comment | Rating columns, blocks
+// arranged side-by-side across the sheet, separated by blank columns)
 // ══════════════════════════════════════
-let analyticsRaw=[];        // raw parsed rows: {ticketId, assignee, solvedDate, rating}
-let analyticsMonth='';      // 'YYYY-MM'
+let analyticsWeeks={};      // {weekLabel: {agentData: {agentName: [{ticketRef,comment,rating}]}, uploadedAt}}
+let analyticsCurrentWeek='';
+
+function parseAgentBlockSheet(sheet){
+  // Read as a raw 2D array (no header assumption) so we can scan for agent blocks anywhere
+  const aoa=XLSX.utils.sheet_to_json(sheet,{header:1,defval:null,raw:false});
+  const result={}; // {agentName: [{ticketRef, comment, rating}]}
+
+  const numRows=aoa.length;
+  const numCols=Math.max(...aoa.map(r=>r.length),0);
+
+  // Scan every column for a cell that looks like an agent header:
+  // a non-empty string, where the row below it is empty/header-like
+  // (\"Ticket Reference\", \"Comment\", \"Rating\") in that col / col+1 / col+2
+  for(let c=0;c<numCols;c++){
+    for(let r=0;r<numRows;r++){
+      const cell=aoa[r]?.[c];
+      if(!cell||typeof cell!=='string') continue;
+      const cellL=cell.trim().toLowerCase();
+      if(cellL==='ticket reference'||cellL==='ticket id'||cellL==='comment'||cellL==='rating') continue;
+
+      // Check if the NEXT row at this column contains "Ticket Reference" (header row pattern)
+      const nextRow=aoa[r+1];
+      if(!nextRow) continue;
+      const headerCell=String(nextRow[c]||'').trim().toLowerCase();
+      if(headerCell!=='ticket reference'&&headerCell!=='ticket id') continue;
+
+      // Found an agent block! cell = agent name, r+1 = header row, data starts r+2
+      const agentName=cell.trim();
+      // Find Comment and Rating columns — usually c+1 and c+2, but verify
+      let commentCol=c+1, ratingCol=c+2;
+      for(let cc=c;cc<Math.min(c+5,numCols);cc++){
+        const h=String(nextRow[cc]||'').trim().toLowerCase();
+        if(h==='comment') commentCol=cc;
+        if(h==='rating') ratingCol=cc;
+      }
+
+      const tickets=[];
+      let rr=r+2;
+      while(rr<numRows){
+        const ticketRef=aoa[rr]?.[c];
+        const comment=aoa[rr]?.[commentCol];
+        const rating=aoa[rr]?.[ratingCol];
+        if(ticketRef==null||ticketRef==='') break; // end of this agent's block
+        tickets.push({
+          ticketRef:String(ticketRef).trim(),
+          comment:comment?String(comment).trim():'',
+          rating:rating?String(rating).trim().toLowerCase():''
+        });
+        rr++;
+      }
+
+      if(!result[agentName]) result[agentName]=[];
+      result[agentName]=result[agentName].concat(tickets);
+    }
+  }
+  return result;
+}
 
 function handleAnalyticsFile(file){
   const errEl=el('analytics-upload-err');
   errEl.style.display='none';
+
+  const weekLabel=v('analytics-week-label')||('Upload '+new Date().toLocaleDateString());
+
   el('analytics-loading').style.display='block';
   el('analytics-upload-zone').style.display='none';
 
@@ -1603,61 +1679,33 @@ function handleAnalyticsFile(file){
     try{
       const data=new Uint8Array(e.target.result);
       const wb=XLSX.read(data,{type:'array',cellDates:true});
+
+      if(!wb.SheetNames||!wb.SheetNames.length){
+        throw new Error('This file could not be read — it may be saved in a format Excel calls "Strict Open XML". In Excel, use File → Save As → Excel Workbook (.xlsx) (NOT "Strict Open XML Spreadsheet"), then re-upload.');
+      }
+
       const sheet=wb.Sheets[wb.SheetNames[0]];
-      const rows=XLSX.utils.sheet_to_json(sheet,{defval:null});
-      if(!rows.length) throw new Error('File is empty.');
+      const agentData=parseAgentBlockSheet(sheet);
+      const agentNames=Object.keys(agentData);
 
-      const sample=rows[0];
-      const keys=Object.keys(sample);
-      const findKey=(patterns)=>keys.find(k=>patterns.some(p=>k.toLowerCase().replace(/[\s_-]/g,'').includes(p)));
+      if(!agentNames.length){
+        throw new Error('Could not detect any agent blocks. Make sure each agent has a name header followed by "Ticket Reference / Comment / Rating" columns.');
+      }
 
-      const kTicket=findKey(['ticketid','ticket','id']);
-      const kAssignee=findKey(['assignee','agent']);
-      const kSolved=findKey(['solveddate','solved','solveat','closeddate']);
-      const kRating=findKey(['rating','satisfaction','csat']);
+      // Save this week's data
+      analyticsWeeks[weekLabel]={agentData,uploadedAt:Date.now()};
+      analyticsCurrentWeek=weekLabel;
 
-      if(!kAssignee) throw new Error('Could not find an "Assignee" column. Check your file headers.');
-
-      analyticsRaw=rows.map(r=>{
-        let solvedDate=r[kSolved];
-        if(solvedDate instanceof Date){
-          // keep
-        } else if(typeof solvedDate==='number'){
-          solvedDate=new Date((solvedDate-25569)*86400*1000);
-        } else if(typeof solvedDate==='string'&&solvedDate.trim()){
-          const parsed=new Date(solvedDate);
-          solvedDate=isNaN(parsed.getTime())?null:parsed;
-        } else {
-          solvedDate=null;
-        }
-        let rating=r[kRating];
-        if(typeof rating==='string') rating=rating.trim();
-        return{
-          ticketId:kTicket?r[kTicket]:null,
-          assignee:r[kAssignee]?String(r[kAssignee]).trim():null,
-          solvedDate,
-          rating
-        };
-      }).filter(r=>r.assignee);
-
-      if(!analyticsRaw.length) throw new Error('No valid rows found after parsing.');
-
-      // Auto-detect month from data (most common month in solved dates)
-      const monthCounts={};
-      analyticsRaw.forEach(r=>{
-        if(r.solvedDate){
-          const mk=r.solvedDate.getFullYear()+'-'+String(r.solvedDate.getMonth()+1).padStart(2,'0');
-          monthCounts[mk]=(monthCounts[mk]||0)+1;
-        }
-      });
-      const topMonth=Object.entries(monthCounts).sort((a,b)=>b[1]-a[1])[0];
-      analyticsMonth=topMonth?topMonth[0]:new Date().toISOString().slice(0,7);
-      el('analytics-month').value=analyticsMonth;
+      // Persist to Firestore so it survives refresh
+      saveAnalyticsToFirestore();
 
       el('analytics-loading').style.display='none';
       el('analytics-report').style.display='block';
       el('btn-analytics-clear').style.display='inline-flex';
       el('btn-analytics-export').style.display='inline-flex';
+      el('analytics-week-label').value='';
+
+      renderAnalyticsWeekBar();
       renderAnalyticsReport();
 
     }catch(err){
@@ -1676,260 +1724,214 @@ function handleAnalyticsFile(file){
   reader.readAsArrayBuffer(file);
 }
 
+async function saveAnalyticsToFirestore(){
+  try{
+    await _db.collection('analytics').doc('weeklyData').set({weeks:JSON.stringify(analyticsWeeks)});
+  }catch(e){console.error('Could not save analytics:',e.message);}
+}
+
+async function loadAnalyticsFromFirestore(){
+  try{
+    const doc=await _db.collection('analytics').doc('weeklyData').get();
+    if(doc.exists){
+      const data=doc.data();
+      analyticsWeeks=data.weeks?JSON.parse(data.weeks):{};
+      const labels=Object.keys(analyticsWeeks);
+      if(labels.length){
+        analyticsCurrentWeek=labels.sort((a,b)=>(analyticsWeeks[b].uploadedAt||0)-(analyticsWeeks[a].uploadedAt||0))[0];
+        el('analytics-report').style.display='block';
+        el('btn-analytics-clear').style.display='inline-flex';
+        el('btn-analytics-export').style.display='inline-flex';
+        el('analytics-upload-zone').style.display='none';
+        renderAnalyticsWeekBar();
+        renderAnalyticsReport();
+      }
+    }
+  }catch(e){console.error('Could not load analytics:',e.message);}
+}
+
 function resetAnalytics(){
-  analyticsRaw=[];
   el('analytics-report').style.display='none';
   el('analytics-upload-zone').style.display='block';
-  el('btn-analytics-clear').style.display='none';
-  el('btn-analytics-export').style.display='none';
   el('analytics-file-input').value='';
+  el('analytics-week-label').value='';
 }
 
-function onAnalyticsMonthChange(){
-  analyticsMonth=el('analytics-month').value;
-  renderAnalyticsReport();
-}
+function renderAnalyticsWeekBar(){
+  const bar=el('analytics-week-bar');
+  const labels=Object.keys(analyticsWeeks).sort((a,b)=>(analyticsWeeks[a].uploadedAt||0)-(analyticsWeeks[b].uploadedAt||0));
+  if(!labels.length){bar.innerHTML='';return;}
+  bar.innerHTML='<span class="wk-lbl">Week:</span>'+
+    labels.map(l=>`<div class="wk-chip${l===analyticsCurrentWeek?' active':''}" data-aweek="${l}">${l}</div>`).join('')+
+    '<button class="btn btn-ghost btn-xs" id="btn-analytics-delweek" style="margin-left:.5rem">🗑 Delete this week</button>';
 
-// ── Build week definitions for a given month: Week 1-4 = 7 days each, Week 5 = leftover (3-4 days) ──
-function buildMonthWeeks(monthKey){
-  const [y,m]=monthKey.split('-').map(Number);
-  const daysInMonth=new Date(y,m,0).getDate(); // m is 1-indexed here, Date() takes 0 for "last day of prev month" trick
-  const weeks=[];
-  let dayCursor=1;
-  let weekNum=1;
-  while(dayCursor<=daysInMonth){
-    const remaining=daysInMonth-dayCursor+1;
-    // Weeks 1-4 are fixed 7 days; if remaining <=7 and weekNum<=4, this is the last full/partial week
-    let len;
-    if(weekNum<=4 && remaining>7){
-      len=7;
-    } else if(weekNum<=4 && remaining<=7){
-      len=remaining; // last week absorbs naturally if month is exactly 28 days
-    } else {
-      len=remaining; // week 5 = leftover days (3-4 typically)
-    }
-    const startDay=dayCursor;
-    const endDay=Math.min(dayCursor+len-1,daysInMonth);
-    weeks.push({
-      weekNum,
-      label:'Week '+weekNum,
-      startDate:new Date(y,m-1,startDay),
-      endDate:new Date(y,m-1,endDay),
+  bar.querySelectorAll('[data-aweek]').forEach(chip=>{
+    chip.addEventListener('click',()=>{
+      analyticsCurrentWeek=chip.dataset.aweek;
+      renderAnalyticsWeekBar();
+      renderAnalyticsReport();
     });
-    dayCursor=endDay+1;
-    weekNum++;
+  });
+  const delBtn=el('btn-analytics-delweek');
+  if(delBtn) delBtn.addEventListener('click',deleteCurrentAnalyticsWeek);
+}
+
+async function deleteCurrentAnalyticsWeek(){
+  if(!analyticsCurrentWeek) return;
+  if(!confirm('Delete data for "'+analyticsCurrentWeek+'"?')) return;
+  delete analyticsWeeks[analyticsCurrentWeek];
+  await saveAnalyticsToFirestore();
+  const remaining=Object.keys(analyticsWeeks);
+  if(remaining.length){
+    analyticsCurrentWeek=remaining.sort((a,b)=>(analyticsWeeks[b].uploadedAt||0)-(analyticsWeeks[a].uploadedAt||0))[0];
+    renderAnalyticsWeekBar();
+    renderAnalyticsReport();
+  } else {
+    resetAnalytics();
   }
-  return weeks;
 }
 
-function dayKeyOf(date){
-  const d=new Date(date);
-  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
-}
-function fmtShortDate(date){
-  return new Date(date).toLocaleDateString('en-GB',{day:'numeric',month:'short'});
-}
-
-function isGoodRating(r){
-  if(r==null) return false;
-  const s=String(r).toLowerCase();
-  return s.includes('good')||s.includes('satisf')||s==='positive'||s==='5'||s==='4'||s==='thumb_up'||s==='thumbsup';
-}
-function isBadRating(r){
-  if(r==null) return false;
-  const s=String(r).toLowerCase();
-  return s.includes('bad')||s.includes('unsatisf')||s.includes('dissatisf')||s==='negative'||s==='1'||s==='2'||s==='thumb_down'||s==='thumbsdown';
+function classifyRating(r){
+  const s=(r||'').toLowerCase();
+  if(s.includes('good')) return 'good';
+  if(s.includes('bad')) return 'bad';
+  if(s.includes('advice')) return 'advice';
+  return 'other';
 }
 
 function renderAnalyticsReport(){
-  if(!analyticsRaw.length||!analyticsMonth) return;
+  const weekData=analyticsWeeks[analyticsCurrentWeek];
+  if(!weekData) return;
+  const agentData=weekData.agentData;
 
-  // Employee columns = ShiftFlow employee list (not from file)
-  const agents=emps.map(e=>e.name).sort();
-  if(!agents.length){
-    el('analytics-summary').textContent='No employees found — add employees first.';
-    return;
-  }
+  // Use ShiftFlow employee list for column order, but include any extra names found in the file
+  const fileAgents=Object.keys(agentData);
+  const knownAgents=emps.map(e=>e.name);
+  const agents=[...knownAgents.filter(a=>fileAgents.includes(a)), ...fileAgents.filter(a=>!knownAgents.includes(a))];
 
-  const weeks=buildMonthWeeks(analyticsMonth);
-  const validRows=analyticsRaw.filter(r=>r.solvedDate);
+  // ── Totals: tickets reviewed, good, bad, advice per agent ──
+  const totals={},good={},bad={},advice={};
+  agents.forEach(a=>{totals[a]=0;good[a]=0;bad[a]=0;advice[a]=0;});
 
-  // Filter rows to only the selected month
-  const [my,mm]=analyticsMonth.split('-').map(Number);
-  const monthRows=validRows.filter(r=>r.solvedDate.getFullYear()===my&&(r.solvedDate.getMonth()+1)===mm);
+  const flaggedTickets=[]; // bad/advice tickets with comments
 
-  // ── Monthly summary table: rows = Week 1..5, cols = agents, + Total Per Month row ──
-  const volByWeek={};
-  weeks.forEach(w=>{volByWeek[w.label]={};agents.forEach(a=>volByWeek[w.label][a]=0);});
-  monthRows.forEach(r=>{
-    const dk=dayKeyOf(r.solvedDate);
-    const week=weeks.find(w=>dayKeyOf(w.startDate)<=dk&&dk<=dayKeyOf(w.endDate));
-    if(week&&volByWeek[week.label][r.assignee]!==undefined) volByWeek[week.label][r.assignee]++;
-  });
-  renderMonthlySummary('atbl-volume',weeks,agents,volByWeek,'Total Per Month','');
-
-  // ── Good ratings monthly summary ──
-  const goodByWeek={};
-  weeks.forEach(w=>{goodByWeek[w.label]={};agents.forEach(a=>goodByWeek[w.label][a]=0);});
-  monthRows.forEach(r=>{
-    if(!isGoodRating(r.rating)) return;
-    const dk=dayKeyOf(r.solvedDate);
-    const week=weeks.find(w=>dayKeyOf(w.startDate)<=dk&&dk<=dayKeyOf(w.endDate));
-    if(week&&goodByWeek[week.label][r.assignee]!==undefined) goodByWeek[week.label][r.assignee]++;
-  });
-  renderMonthlySummary('atbl-good',weeks,agents,goodByWeek,'Total Good Ratings','atbl-good');
-
-  // ── Bad ratings monthly summary ──
-  const badByWeek={};
-  weeks.forEach(w=>{badByWeek[w.label]={};agents.forEach(a=>badByWeek[w.label][a]=0);});
-  monthRows.forEach(r=>{
-    if(!isBadRating(r.rating)) return;
-    const dk=dayKeyOf(r.solvedDate);
-    const week=weeks.find(w=>dayKeyOf(w.startDate)<=dk&&dk<=dayKeyOf(w.endDate));
-    if(week&&badByWeek[week.label][r.assignee]!==undefined) badByWeek[week.label][r.assignee]++;
-  });
-  renderMonthlySummary('atbl-bad',weeks,agents,badByWeek,'Total Bad Ratings','atbl-bad');
-
-  // ── Per-week daily breakdown tables (one card per week) ──
-  const weeklyWrap=el('analytics-weekly-tables');
-  weeklyWrap.innerHTML='';
-  weeks.forEach(week=>{
-    const dayKeys=[];
-    let cur=new Date(week.startDate);
-    while(cur<=week.endDate){dayKeys.push(dayKeyOf(cur));cur.setDate(cur.getDate()+1);}
-
-    const dayMap={};
-    dayKeys.forEach(dk=>{dayMap[dk]={};agents.forEach(a=>dayMap[dk][a]=0);});
-    monthRows.forEach(r=>{
-      const dk=dayKeyOf(r.solvedDate);
-      if(dayMap[dk]&&dayMap[dk][r.assignee]!==undefined) dayMap[dk][r.assignee]++;
+  agents.forEach(a=>{
+    (agentData[a]||[]).forEach(t=>{
+      totals[a]++;
+      const cls=classifyRating(t.rating);
+      if(cls==='good') good[a]++;
+      else if(cls==='bad'){bad[a]++;flaggedTickets.push({agent:a,...t,cls});}
+      else if(cls==='advice'){advice[a]++;flaggedTickets.push({agent:a,...t,cls});}
     });
-
-    const card=document.createElement('div');
-    card.className='card';
-    const rangeStr=fmtShortDate(week.startDate)+' – '+fmtShortDate(week.endDate);
-    card.innerHTML=`<div class="card-title">🗓 ${week.label} <span style="font-weight:400;color:var(--grey-400);font-size:.78rem;margin-left:.4rem">${rangeStr}</span></div>
-      <div class="tbl-wrap"><table id="atbl-daily-${week.weekNum}"></table></div>`;
-    weeklyWrap.appendChild(card);
-
-    renderDailyHeatmap('atbl-daily-'+week.weekNum,dayKeys,agents,dayMap);
   });
 
-  // Summary line
-  const totalTickets=monthRows.length;
-  const monthLabel=new Date(my,mm-1,1).toLocaleDateString('en-GB',{month:'long',year:'numeric'});
-  el('analytics-summary').textContent=`${totalTickets} tickets · ${agents.length} agents · ${monthLabel}`;
+  renderSingleRowTable('atbl-volume',agents,totals,'Total Reviewed');
+  renderSingleRowTable('atbl-good',agents,good,'Total Good','atbl-good');
+  renderSingleRowTable('atbl-bad',agents,bad,'Total Bad','atbl-bad');
+  renderSingleRowTable('atbl-advice',agents,advice,'Total Advice','atbl-advice');
+
+  // Summary text
+  const totalAll=Object.values(totals).reduce((a,b)=>a+b,0);
+  el('analytics-summary').textContent=`${analyticsCurrentWeek} · ${totalAll} tickets · ${agents.length} agents`;
+
+  // Flagged tickets list
+  renderFlaggedTickets(flaggedTickets);
+
+  // Trend across weeks (if more than 1 week uploaded)
+  renderAnalyticsTrend(agents);
 }
 
-function renderMonthlySummary(tblId,weeks,agents,dataMap,totalLabel,extraClass){
+function renderSingleRowTable(tblId,agents,dataObj,rowLabel,extraClass){
   const tbl=el(tblId);
   tbl.className='atbl'+(extraClass?' '+extraClass:'');
   let html='<thead><tr><th class="row-hdr"></th>'+agents.map(a=>`<th>${a}</th>`).join('')+'</tr></thead><tbody>';
-
-  const totals={};agents.forEach(a=>totals[a]=0);
-  weeks.forEach(w=>{
-    html+=`<tr><td class="row-label">${w.label}</td>`;
-    agents.forEach(a=>{
-      const v=dataMap[w.label][a]||0;
-      totals[a]+=v;
-      html+=`<td>${v||''}</td>`;
-    });
-    html+='</tr>';
-  });
-  html+=`<tr class="total-row"><td class="row-label">${totalLabel}</td>`;
-  agents.forEach(a=>{html+=`<td>${totals[a]}</td>`;});
+  html+=`<tr class="total-row"><td class="row-label">${rowLabel}</td>`;
+  agents.forEach(a=>{html+=`<td>${dataObj[a]||0}</td>`;});
   html+='</tr></tbody>';
   tbl.innerHTML=html;
 }
 
-function renderDailyHeatmap(tblId,dayKeys,agents,dayMap){
-  const tbl=el(tblId);
-  if(!tbl) return;
+function renderFlaggedTickets(flaggedTickets){
+  const wrap=el('analytics-flagged-list');
+  if(!flaggedTickets.length){
+    wrap.innerHTML='<div style="padding:1rem;text-align:center;color:var(--grey-400);font-size:.85rem">No bad or advice-flagged tickets this week 🎉</div>';
+    return;
+  }
+  wrap.innerHTML=flaggedTickets.map(t=>{
+    const isBad=t.cls==='bad';
+    const clr=isBad?'var(--red)':'var(--amber)';
+    const bg=isBad?'var(--red-light)':'var(--amber-light)';
+    const icon=isBad?'😞':'💡';
+    return `<div style="display:flex;gap:.75rem;align-items:flex-start;padding:.65rem .9rem;border-radius:var(--r2);background:${bg};margin-bottom:.5rem">
+      <span style="font-size:1rem">${icon}</span>
+      <div style="flex:1">
+        <div style="font-size:.8rem;font-weight:700;color:var(--grey-900)">${t.agent} <span style="font-weight:400;color:var(--grey-400)">· #${t.ticketRef}</span></div>
+        ${t.comment?`<div style="font-size:.8rem;color:${clr};margin-top:2px">${t.comment}</div>`:''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderAnalyticsTrend(agents){
+  const labels=Object.keys(analyticsWeeks).sort((a,b)=>(analyticsWeeks[a].uploadedAt||0)-(analyticsWeeks[b].uploadedAt||0));
+  const card=el('analytics-trend-card');
+  if(labels.length<2){card.style.display='none';return;}
+  card.style.display='block';
+
+  const tbl=el('atbl-trend');
   tbl.className='atbl';
-  const colMax={};agents.forEach(a=>{colMax[a]=Math.max(1,...dayKeys.map(d=>dayMap[d][a]||0));});
-
-  let html='<thead><tr><th class="row-hdr">Date</th>'+agents.map(a=>`<th>${a}</th>`).join('')+'<th>Total</th></tr></thead><tbody>';
-  const colTotals={};agents.forEach(a=>colTotals[a]=0);
-  let grandTotal=0;
-
-  dayKeys.forEach(dk=>{
-    let rowTotal=0;
-    const dLabel=new Date(dk).toLocaleDateString('en-GB',{day:'numeric',month:'short',weekday:'short'});
-    html+=`<tr><td class="row-label">${dLabel}</td>`;
+  let html='<thead><tr><th class="row-hdr">Week</th>'+agents.map(a=>`<th>${a}</th>`).join('')+'</tr></thead><tbody>';
+  labels.forEach(l=>{
+    const wd=analyticsWeeks[l].agentData;
+    html+=`<tr><td class="row-label">${l}</td>`;
     agents.forEach(a=>{
-      const v=dayMap[dk][a]||0;
-      rowTotal+=v;colTotals[a]+=v;
-      const intensity=v/colMax[a];
-      const bg=v===0?'transparent':`rgba(240,35,60,${(0.06+intensity*0.22).toFixed(2)})`;
-      const fontW=v===0?'400':'700';
-      html+=`<td style="background:${bg};font-weight:${fontW};color:${v===0?'var(--grey-400)':'var(--grey-900)'}">${v||'—'}</td>`;
+      const cnt=(wd[a]||[]).length;
+      html+=`<td>${cnt||''}</td>`;
     });
-    grandTotal+=rowTotal;
-    html+=`<td style="font-weight:800;background:var(--grey-50)">${rowTotal}</td></tr>`;
+    html+='</tr>';
   });
-
-  html+=`<tr class="total-row"><td class="row-label">Total</td>`;
-  agents.forEach(a=>{html+=`<td>${colTotals[a]}</td>`;});
-  html+=`<td>${grandTotal}</td></tr></tbody>`;
+  html+='</tbody>';
   tbl.innerHTML=html;
 }
 
 function exportAnalyticsExcel(){
-  if(!analyticsRaw.length){toast('No data to export','err');return;}
+  const weekData=analyticsWeeks[analyticsCurrentWeek];
+  if(!weekData){toast('No data to export','err');return;}
   if(typeof XLSX==='undefined'){toast('XLSX not loaded','err');return;}
 
-  const agents=emps.map(e=>e.name).sort();
-  const weeks=buildMonthWeeks(analyticsMonth);
-  const [my,mm]=analyticsMonth.split('-').map(Number);
-  const monthRows=analyticsRaw.filter(r=>r.solvedDate&&r.solvedDate.getFullYear()===my&&(r.solvedDate.getMonth()+1)===mm);
-
+  const agentData=weekData.agentData;
+  const agents=Object.keys(agentData);
   const wb=XLSX.utils.book_new();
 
-  function buildWeekSheet(filterFn,totalLabel){
-    const aoa=[['',...agents]];
-    const totals={};agents.forEach(a=>totals[a]=0);
-    weeks.forEach(w=>{
-      const row=[w.label];
-      agents.forEach(a=>{
-        const cnt=monthRows.filter(r=>filterFn(r)&&r.assignee===a&&dayKeyOf(r.solvedDate)>=dayKeyOf(w.startDate)&&dayKeyOf(r.solvedDate)<=dayKeyOf(w.endDate)).length;
-        totals[a]+=cnt;
-        row.push(cnt||'');
-      });
-      aoa.push(row);
+  // Summary sheet
+  const totals={},good={},bad={},advice={};
+  agents.forEach(a=>{totals[a]=0;good[a]=0;bad[a]=0;advice[a]=0;});
+  agents.forEach(a=>{
+    (agentData[a]||[]).forEach(t=>{
+      totals[a]++;
+      const cls=classifyRating(t.rating);
+      if(cls==='good') good[a]++;
+      else if(cls==='bad') bad[a]++;
+      else if(cls==='advice') advice[a]++;
     });
-    aoa.push([totalLabel,...agents.map(a=>totals[a])]);
-    return XLSX.utils.aoa_to_sheet(aoa);
-  }
+  });
+  const summaryAoa=[
+    ['',...agents],
+    ['Total Reviewed',...agents.map(a=>totals[a])],
+    ['Good',...agents.map(a=>good[a])],
+    ['Bad',...agents.map(a=>bad[a])],
+    ['Advice',...agents.map(a=>advice[a])],
+  ];
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(summaryAoa),'Summary');
 
-  XLSX.utils.book_append_sheet(wb,buildWeekSheet(()=>true,'Total Per Month'),'Tickets Solved');
-  XLSX.utils.book_append_sheet(wb,buildWeekSheet(r=>isGoodRating(r.rating),'Total Good Ratings'),'Good Ratings');
-  XLSX.utils.book_append_sheet(wb,buildWeekSheet(r=>isBadRating(r.rating),'Total Bad Ratings'),'Bad Ratings');
-
-  // Daily sheets per week
-  weeks.forEach(w=>{
-    const dayKeys=[];
-    let cur=new Date(w.startDate);
-    while(cur<=w.endDate){dayKeys.push(dayKeyOf(cur));cur.setDate(cur.getDate()+1);}
-    const aoa=[['Date',...agents,'Total']];
-    const colTotals={};agents.forEach(a=>colTotals[a]=0);
-    let grand=0;
-    dayKeys.forEach(dk=>{
-      const row=[new Date(dk).toLocaleDateString('en-GB',{day:'numeric',month:'short'})];
-      let rowTotal=0;
-      agents.forEach(a=>{
-        const cnt=monthRows.filter(r=>r.assignee===a&&dayKeyOf(r.solvedDate)===dk).length;
-        colTotals[a]+=cnt;rowTotal+=cnt;
-        row.push(cnt||'');
-      });
-      grand+=rowTotal;
-      row.push(rowTotal);
-      aoa.push(row);
-    });
-    aoa.push(['Total',...agents.map(a=>colTotals[a]),grand]);
-    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(aoa),w.label);
+  // Per-agent detail sheets
+  agents.forEach(a=>{
+    const aoa=[['Ticket Reference','Comment','Rating']];
+    (agentData[a]||[]).forEach(t=>aoa.push([t.ticketRef,t.comment,t.rating]));
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(aoa),a.slice(0,28));
   });
 
-  XLSX.writeFile(wb,'zendesk_report_'+analyticsMonth+'.xlsx');
+  XLSX.writeFile(wb,'analytics_'+analyticsCurrentWeek.replace(/[^a-z0-9]/gi,'_')+'.xlsx');
   toast('Excel exported!','ok');
 }
 
@@ -3090,7 +3092,7 @@ window.go=go; window.setView=setView; window.openNewWeekModal=openNewWeekModal;
 window.createWeek=createWeek; window.publishWeek=publishWeek;
 window.assignTasksAndSave=assignTasksAndSave; window.exportExcel=exportExcel;
 window.handleAnalyticsFile=handleAnalyticsFile; window.resetAnalytics=resetAnalytics;
-window.onAnalyticsMonthChange=onAnalyticsMonthChange; window.exportAnalyticsExcel=exportAnalyticsExcel;
+window.exportAnalyticsExcel=exportAnalyticsExcel; window.deleteCurrentAnalyticsWeek=deleteCurrentAnalyticsWeek;
 window.openCellModal=openCellModal; window.saveCell=saveCell; window.clearCell=clearCell;
 window.pickType=pickType; window.loadRequests=loadRequests; window.filterReqs=filterReqs;
 window.appDay=appDay; window.appAll=appAll; window.rejAll=rejAll;
@@ -3135,8 +3137,6 @@ wire('btn-export',       exportExcel);
 wire('btn-analytics-pick',  ()=>el('analytics-file-input').click());
 wire('btn-analytics-clear', resetAnalytics);
 wire('btn-analytics-export',exportAnalyticsExcel);
-const analyticsMonthInput=document.getElementById('analytics-month');
-if(analyticsMonthInput) analyticsMonthInput.addEventListener('change',onAnalyticsMonthChange);
 const analyticsFileInput=document.getElementById('analytics-file-input');
 if(analyticsFileInput){
   analyticsFileInput.addEventListener('change',function(e){
