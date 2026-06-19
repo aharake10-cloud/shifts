@@ -306,16 +306,36 @@ select option{background:var(--white);}
 /* Analytics tables — fixed layout so they never overflow the card */
 .atbl{width:100%;table-layout:fixed;border-collapse:collapse;font-size:.78rem;}
 .atbl th{background:var(--grey-50);padding:.45rem .4rem;text-align:center;font-size:.64rem;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--grey-400);border-bottom:1.5px solid var(--grey-100);white-space:normal;word-break:break-word;overflow:hidden;}
-.atbl th.row-hdr{text-align:left;background:var(--grey-900);color:#fff;width:90px;}
+.atbl th.row-hdr{text-align:left;background:var(--grey-50);color:var(--grey-400);width:90px;}
 .atbl td{padding:.4rem .35rem;text-align:center;border-bottom:1px solid var(--grey-100);font-weight:600;overflow:hidden;text-overflow:ellipsis;}
 .atbl td.row-label{text-align:left;font-weight:700;background:var(--grey-50);color:var(--grey-900);width:90px;font-size:.72rem;}
 .atbl tr.total-row td{background:var(--amber-light);color:var(--amber);font-weight:800;border-top:2px solid var(--amber);}
 .atbl tr.total-row td.row-label{background:var(--amber-light);}
-.atbl-good td:not(.row-label){color:var(--success);}
-.atbl-bad td:not(.row-label){color:var(--red);}
+.atbl-good td:not(.row-label){color:var(--success);font-weight:700;}
+.atbl-bad td:not(.row-label){color:var(--red);font-weight:700;}
+.atbl-advice td:not(.row-label){color:var(--amber);font-weight:700;}
 .atbl td.editable-cell{cursor:pointer;transition:background .12s;}
 .atbl td.editable-cell:hover{background:var(--primary-light);}
 .atbl td.editable-cell input{width:100%;border:none;background:transparent;text-align:center;font-weight:700;font-size:.78rem;font-family:inherit;color:inherit;padding:0;}
+
+/* Analytics section headers */
+.analytics-section-hdr{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:1rem;}
+.analytics-section-title{font-size:1.1rem;font-weight:800;color:var(--grey-900);}
+.analytics-section-sub{font-size:.82rem;color:var(--grey-400);margin-top:.15rem;}
+
+/* Per-week volume card with collapsible daily grid */
+.vweek-card{background:var(--white);border-radius:var(--r);box-shadow:var(--shadow);margin-bottom:1rem;overflow:hidden;}
+.vweek-hdr{display:flex;align-items:center;justify-content:space-between;padding:.9rem 1.25rem;cursor:pointer;user-select:none;}
+.vweek-hdr:hover{background:var(--grey-50);}
+.vweek-title{display:flex;align-items:center;gap:.6rem;font-weight:800;font-size:.95rem;color:var(--grey-900);}
+.vweek-chevron{font-size:.7rem;color:var(--grey-400);transition:transform .18s;}
+.vweek-card.collapsed .vweek-chevron{transform:rotate(-90deg);}
+.vweek-totals{display:flex;gap:1.1rem;font-size:.78rem;color:var(--grey-400);}
+.vweek-totals strong{color:var(--primary);font-weight:800;}
+.vweek-body{border-top:1px solid var(--grey-100);}
+.vweek-card.collapsed .vweek-body{display:none;}
+.vweek-del{background:none;border:none;color:var(--grey-300);cursor:pointer;font-size:.85rem;padding:.2rem .4rem;border-radius:6px;}
+.vweek-del:hover{background:var(--red-light);color:var(--red);}
 table{width:100%;border-collapse:collapse;font-size:.85rem;background:var(--white);}
 thead th{background:var(--grey-50);padding:.6rem .9rem;text-align:left;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--grey-400);border-bottom:1.5px solid var(--grey-100);}
 tbody tr{border-bottom:1px solid var(--grey-100);transition:background .12s;}
@@ -523,21 +543,19 @@ details.card>summary::-webkit-details-marker{display:none;}
     <!-- ANALYTICS -->
     <div class="page" id="page-analytics">
       <div class="page-hdr">
-        <div><div class="page-title">Analytics</div><div class="page-sub">Track ticket volume manually + upload rating sheets per week</div></div>
+        <div><div class="page-title">Analytics</div><div class="page-sub">Track daily ticket volume + upload rating sheets per week</div></div>
       </div>
 
-      <!-- ═══ SECTION 1: MANUAL TICKET VOLUME ═══ -->
-      <div class="card">
-        <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
-          <span>📋 Tickets Handled Per Week <span style="font-weight:400;color:var(--grey-400);font-size:.78rem">(click a cell to edit)</span></span>
-          <button class="btn btn-white btn-xs" id="btn-vol-addweek">+ Add Week</button>
-        </div>
-        <div class="tbl-wrap"><table id="vtbl-volume" class="atbl"></table></div>
+      <!-- ═══ SECTION 1: MANUAL DAILY TICKET VOLUME ═══ -->
+      <div class="analytics-section-hdr">
+        <div><div class="analytics-section-title">📋 Tickets Handled</div><div class="analytics-section-sub">Daily count per agent — click any number to edit</div></div>
+        <button class="btn btn-green btn-sm" id="btn-vol-addweek">+ Add Week</button>
       </div>
+      <div id="volume-weeks-wrap"></div>
 
       <!-- ═══ SECTION 2: RATING UPLOADS ═══ -->
-      <div class="page-hdr" style="margin-top:1.5rem">
-        <div><div class="page-title" style="font-size:1.1rem">Ticket Ratings</div><div class="page-sub">Upload your weekly review sheet (good / bad / advice per agent)</div></div>
+      <div class="analytics-section-hdr" style="margin-top:2rem">
+        <div><div class="analytics-section-title">⭐ Ticket Ratings</div><div class="analytics-section-sub">Upload your weekly review sheet (good / bad / advice per agent)</div></div>
         <div class="btn-row">
           <button class="btn btn-white btn-sm" id="btn-analytics-clear" style="display:none">↻ Upload another week</button>
           <button class="btn btn-white btn-sm" id="btn-analytics-export" style="display:none">↓ Export Excel</button>
@@ -1625,10 +1643,13 @@ async function assignTasksAndSave(){
 let analyticsWeeks={};      // {weekLabel: {agentData: {agentName: [{ticketRef,comment,rating}]}, uploadedAt}}
 let analyticsCurrentWeek='';
 
-// ── Manual ticket-volume table (editable grid, separate from rating uploads) ──
-// Structure: {weekLabels: ['Week 1','Week 2',...], data: {weekLabel: {agentName: count}}}
+// ── Manual daily ticket-volume table ──
+// Structure: weeks = ['Week 1','Week 2',...]
+// volumeData = { weekLabel: { dayIndex(0-6): { agentName: count } } }
+const VOL_DAYS=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
 let volumeWeeks=[];     // ordered list of week labels
-let volumeData={};      // {weekLabel: {agentName: count}}
+let volumeData={};      // {weekLabel: {dayIdx: {agentName: count}}}
+let volumeCollapsed={}; // {weekLabel: true/false} — true = collapsed
 
 function getVolumeAgents(){
   return emps.map(e=>e.name);
@@ -1666,67 +1687,113 @@ function addVolumeWeek(){
 }
 
 async function removeVolumeWeek(label){
-  if(!confirm('Remove "'+label+'" from the volume table?'))return;
+  if(!confirm('Remove "'+label+'" and all its daily data?'))return;
   volumeWeeks=volumeWeeks.filter(w=>w!==label);
   delete volumeData[label];
   await saveVolumeToFirestore();
   renderVolumeTable();
 }
 
+function toggleVolumeWeek(label){
+  volumeCollapsed[label]=!volumeCollapsed[label];
+  renderVolumeTable();
+}
+
 function renderVolumeTable(){
-  const tbl=el('vtbl-volume');
-  if(!tbl) return;
+  const wrap=el('volume-weeks-wrap');
+  if(!wrap) return;
   const agents=getVolumeAgents();
+
   if(!agents.length){
-    tbl.innerHTML='<tr><td style="padding:1rem;text-align:center;color:var(--grey-400)">Add employees first to track volume.</td></tr>';
+    wrap.innerHTML='<div class="empty"><div class="empty-icon">👥</div>Add employees first to track volume.</div>';
     return;
   }
   if(!volumeWeeks.length){
-    tbl.innerHTML=`<tr><td style="padding:1rem;text-align:center;color:var(--grey-400)">No weeks added yet — click "+ Add Week" to start.</td></tr>`;
+    wrap.innerHTML='<div class="empty"><div class="empty-icon">📋</div>No weeks added yet — click "+ Add Week" to start.</div>';
     return;
   }
 
-  let html='<thead><tr><th class="row-hdr"></th>'+agents.map(a=>`<th>${a}</th>`).join('')+'<th style="width:36px"></th></tr></thead><tbody>';
-  const totals={};agents.forEach(a=>totals[a]=0);
+  wrap.innerHTML=volumeWeeks.map(w=>{
+    const collapsed=!!volumeCollapsed[w];
+    const weekData=volumeData[w]||{};
 
-  volumeWeeks.forEach(w=>{
-    html+=`<tr><td class="row-label">${w}</td>`;
-    agents.forEach(a=>{
-      const v=volumeData[w]?.[a];
-      totals[a]+=(v||0);
-      html+=`<td class="editable-cell" data-vweek="${w}" data-vagent="${a}">${v!=null?v:''}</td>`;
+    // Compute weekly totals per agent + grand total
+    const agentTotals={};agents.forEach(a=>agentTotals[a]=0);
+    let grand=0;
+    VOL_DAYS.forEach((d,di)=>{
+      agents.forEach(a=>{
+        const v=weekData[di]?.[a]||0;
+        agentTotals[a]+=v;grand+=v;
+      });
     });
-    html+=`<td style="text-align:center"><button class="btn-icon-del" data-delweek="${w}" title="Remove week" style="background:none;border:none;color:var(--grey-400);cursor:pointer;font-size:.8rem">✕</button></td></tr>`;
+
+    // Daily grid rows
+    let gridRows=VOL_DAYS.map((d,di)=>{
+      let rowTotal=0;
+      const cells=agents.map(a=>{
+        const v=weekData[di]?.[a];
+        rowTotal+=(v||0);
+        return `<td class="editable-cell" data-vweek="${w}" data-vday="${di}" data-vagent="${a}">${v!=null?v:''}</td>`;
+      }).join('');
+      return `<tr><td class="row-label">${d}</td>${cells}<td style="font-weight:800;background:var(--grey-50)">${rowTotal||''}</td></tr>`;
+    }).join('');
+
+    const totalRow=`<tr class="total-row"><td class="row-label">Total</td>`+
+      agents.map(a=>`<td>${agentTotals[a]}</td>`).join('')+
+      `<td>${grand}</td></tr>`;
+
+    return `<div class="vweek-card${collapsed?' collapsed':''}">
+      <div class="vweek-hdr" data-toggleweek="${w}">
+        <div class="vweek-title"><span class="vweek-chevron">▾</span> ${w}</div>
+        <div class="vweek-totals">
+          ${agents.map(a=>`<span>${a.split(' ')[0]}: <strong>${agentTotals[a]}</strong></span>`).join('')}
+          <span>Total: <strong>${grand}</strong></span>
+          <button class="vweek-del" data-delweek="${w}" title="Remove week">✕</button>
+        </div>
+      </div>
+      <div class="vweek-body">
+        <div class="tbl-wrap" style="box-shadow:none;border-radius:0">
+          <table class="atbl">
+            <thead><tr><th class="row-hdr">Day</th>${agents.map(a=>`<th>${a}</th>`).join('')}<th>Total</th></tr></thead>
+            <tbody>${gridRows}${totalRow}</tbody>
+          </table>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Wire week header toggle
+  wrap.querySelectorAll('[data-toggleweek]').forEach(hdr=>{
+    hdr.addEventListener('click',e=>{
+      if(e.target.closest('[data-delweek]')) return;
+      toggleVolumeWeek(hdr.dataset.toggleweek);
+    });
   });
-
-  html+=`<tr class="total-row"><td class="row-label">Total Per Month</td>`;
-  agents.forEach(a=>{html+=`<td>${totals[a]}</td>`;});
-  html+=`<td></td></tr></tbody>`;
-  tbl.innerHTML=html;
-
+  // Wire delete week
+  wrap.querySelectorAll('[data-delweek]').forEach(btn=>{
+    btn.addEventListener('click',e=>{e.stopPropagation();removeVolumeWeek(btn.dataset.delweek);});
+  });
   // Wire editable cells
-  tbl.querySelectorAll('.editable-cell').forEach(cell=>{
-    cell.addEventListener('click',function(){
-      if(cell.querySelector('input')) return; // already editing
-      const week=cell.dataset.vweek,agent=cell.dataset.vagent;
-      const curVal=volumeData[week]?.[agent]||'';
+  wrap.querySelectorAll('.editable-cell').forEach(cell=>{
+    cell.addEventListener('click',function(e){
+      e.stopPropagation();
+      if(cell.querySelector('input')) return;
+      const week=cell.dataset.vweek,day=cell.dataset.vday,agent=cell.dataset.vagent;
+      const curVal=volumeData[week]?.[day]?.[agent]||'';
       cell.innerHTML=`<input type="number" min="0" value="${curVal}">`;
       const input=cell.querySelector('input');
       input.focus();input.select();
       const commit=()=>{
         const val=parseInt(input.value,10);
         if(!volumeData[week]) volumeData[week]={};
-        volumeData[week][agent]=isNaN(val)?0:val;
+        if(!volumeData[week][day]) volumeData[week][day]={};
+        volumeData[week][day][agent]=isNaN(val)?0:val;
         saveVolumeToFirestore();
         renderVolumeTable();
       };
       input.addEventListener('blur',commit);
-      input.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();input.blur();}});
+      input.addEventListener('keydown',ev=>{if(ev.key==='Enter'){ev.preventDefault();input.blur();}});
     });
-  });
-  // Wire delete week buttons
-  tbl.querySelectorAll('[data-delweek]').forEach(btn=>{
-    btn.addEventListener('click',e=>{e.stopPropagation();removeVolumeWeek(btn.dataset.delweek);});
   });
 }
 
@@ -3227,6 +3294,7 @@ window.createWeek=createWeek; window.publishWeek=publishWeek;
 window.assignTasksAndSave=assignTasksAndSave; window.exportExcel=exportExcel;
 window.handleAnalyticsFile=handleAnalyticsFile; window.resetAnalytics=resetAnalytics;
 window.addVolumeWeek=addVolumeWeek; window.removeVolumeWeek=removeVolumeWeek;
+window.toggleVolumeWeek=toggleVolumeWeek;
 window.loadVolumeFromFirestore=loadVolumeFromFirestore;
 window.exportAnalyticsExcel=exportAnalyticsExcel; window.deleteCurrentAnalyticsWeek=deleteCurrentAnalyticsWeek;
 window.openCellModal=openCellModal; window.saveCell=saveCell; window.clearCell=clearCell;
