@@ -303,52 +303,73 @@ select option{background:var(--white);}
 
 /* ─── TABLES ─── */
 .tbl-wrap{overflow-x:auto;border-radius:var(--r);box-shadow:var(--shadow);}
-/* Analytics tables — fixed layout so they never overflow the card */
-.atbl{width:100%;table-layout:fixed;border-collapse:collapse;font-size:.78rem;}
-.atbl th{background:var(--grey-50);padding:.45rem .4rem;text-align:center;font-size:.64rem;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--grey-400);border-bottom:1.5px solid var(--grey-100);white-space:normal;word-break:break-word;overflow:hidden;}
-.atbl th.row-hdr{text-align:left;background:var(--grey-50);color:var(--grey-400);width:90px;}
-.atbl td{padding:.4rem .35rem;text-align:center;border-bottom:1px solid var(--grey-100);font-weight:600;overflow:hidden;text-overflow:ellipsis;}
-.atbl td.row-label{text-align:left;font-weight:700;background:var(--grey-50);color:var(--grey-900);width:90px;font-size:.72rem;}
-.atbl tr.total-row td{background:var(--amber-light);color:var(--amber);font-weight:800;border-top:2px solid var(--amber);}
-.atbl tr.total-row td.row-label{background:var(--amber-light);}
-.atbl-good td:not(.row-label){color:var(--success);font-weight:700;}
-.atbl-bad td:not(.row-label){color:var(--red);font-weight:700;}
-.atbl-advice td:not(.row-label){color:var(--amber);font-weight:700;}
-.atbl td.editable-cell{cursor:pointer;transition:background .12s;}
-.atbl td.editable-cell:hover{background:var(--primary-light);}
-.atbl td.editable-cell input{width:100%;border:none;background:transparent;text-align:center;font-weight:700;font-size:.78rem;font-family:inherit;color:inherit;padding:0;}
+
+/* ═══ ANALYTICS — refined data tables ═══ */
+.atbl{width:100%;table-layout:fixed;border-collapse:separate;border-spacing:0;font-size:.82rem;}
+.atbl th{background:var(--grey-50);padding:.65rem .5rem;text-align:center;font-size:.66rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--grey-400);border-bottom:2px solid var(--grey-100);white-space:normal;word-break:break-word;overflow:hidden;}
+.atbl th.row-hdr{text-align:left;background:var(--grey-50);color:var(--grey-300);width:92px;font-size:.62rem;}
+.atbl td{padding:.6rem .5rem;text-align:center;border-bottom:1px solid var(--grey-50);font-weight:700;font-size:.86rem;font-variant-numeric:tabular-nums;color:var(--grey-900);transition:background .12s;}
+.atbl tbody tr:hover td{background:var(--grey-50);}
+.atbl tbody tr:hover td.row-label{background:var(--grey-100);}
+.atbl td.row-label{text-align:left;font-weight:700;background:var(--grey-50);color:var(--grey-600);width:92px;font-size:.74rem;border-right:1px solid var(--grey-100);}
+.atbl tr.total-row td{background:linear-gradient(0deg,var(--amber-light),var(--amber-light));color:var(--amber);font-weight:800;border-top:2px solid var(--amber);font-size:.92rem;}
+.atbl tr.total-row td.row-label{background:var(--amber-light);border-right:1px solid rgba(180,130,0,.15);}
+.atbl tr.total-row:hover td{background:var(--amber-light);}
+.atbl-good td:not(.row-label){color:var(--success);}
+.atbl-good tr.total-row td{background:var(--success-light);border-top-color:var(--success);}
+.atbl-good tr.total-row td:not(.row-label){color:var(--success);}
+.atbl-bad td:not(.row-label){color:var(--red);}
+.atbl-bad tr.total-row td{background:var(--red-light);border-top-color:var(--red);}
+.atbl-bad tr.total-row td:not(.row-label){color:var(--red);}
+.atbl-advice td:not(.row-label){color:var(--amber);}
+.atbl td.editable-cell{cursor:pointer;position:relative;}
+.atbl td.editable-cell::after{content:'';position:absolute;inset:3px;border-radius:6px;border:1.5px dashed transparent;transition:border-color .12s;}
+.atbl td.editable-cell:hover::after{border-color:var(--primary);}
+.atbl td.editable-cell:hover{background:var(--primary-light);color:var(--primary);}
+.atbl td.editable-cell input{width:100%;border:none;background:transparent;text-align:center;font-weight:800;font-size:.86rem;font-family:inherit;color:var(--primary);padding:0;}
+.atbl td:empty::before,.atbl td.editable-cell:not(:has(input))::before{content:'–';color:var(--grey-200);font-weight:400;}
+
+/* Quick stat cards above the analytics tables */
+.astat-card{background:var(--white);border-radius:14px;border:1px solid var(--grey-100);padding:1rem 1.1rem;box-shadow:0 1px 2px rgba(0,0,0,.03);}
+.astat-label{font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--grey-400);display:flex;align-items:center;gap:.35rem;margin-bottom:.4rem;}
+.astat-value{font-size:1.65rem;font-weight:800;letter-spacing:-.02em;line-height:1;}
+.astat-sub{font-size:.74rem;color:var(--grey-400);margin-top:.3rem;}
+@media (max-width:700px){#analytics-stat-cards{grid-template-columns:repeat(2,1fr)!important;}}
 
 /* Analytics section headers */
-.analytics-section-hdr{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:1rem;}
-.analytics-section-title{font-size:1.1rem;font-weight:800;color:var(--grey-900);}
-.analytics-section-sub{font-size:.82rem;color:var(--grey-400);margin-top:.15rem;}
+.analytics-section-hdr{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:1.1rem;padding-bottom:.5rem;border-bottom:1px solid var(--grey-100);}
+.analytics-section-title{font-size:1.15rem;font-weight:800;color:var(--grey-900);letter-spacing:-.01em;}
+.analytics-section-sub{font-size:.82rem;color:var(--grey-400);margin-top:.2rem;}
 
 /* Per-week volume card with collapsible daily grid */
-.vweek-card{background:var(--white);border-radius:var(--r);box-shadow:var(--shadow);margin-bottom:1rem;overflow:hidden;}
-.vweek-hdr{display:flex;align-items:center;justify-content:space-between;padding:.9rem 1.25rem;cursor:pointer;user-select:none;}
+.vweek-card{background:var(--white);border-radius:14px;box-shadow:0 1px 2px rgba(0,0,0,.04),0 1px 8px rgba(0,0,0,.03);margin-bottom:.85rem;overflow:hidden;border:1px solid var(--grey-100);transition:box-shadow .15s;}
+.vweek-card:hover{box-shadow:0 2px 4px rgba(0,0,0,.05),0 4px 14px rgba(0,0,0,.05);}
+.vweek-hdr{display:flex;align-items:center;justify-content:space-between;padding:.85rem 1.15rem;cursor:pointer;user-select:none;gap:1rem;flex-wrap:wrap;}
 .vweek-hdr:hover{background:var(--grey-50);}
-.vweek-title{display:flex;align-items:center;gap:.6rem;font-weight:800;font-size:.95rem;color:var(--grey-900);}
-.vweek-chevron{font-size:.7rem;color:var(--grey-400);transition:transform .18s;}
+.vweek-title{display:flex;align-items:center;gap:.55rem;font-weight:800;font-size:.92rem;color:var(--grey-900);}
+.vweek-chevron{font-size:.65rem;color:var(--grey-300);transition:transform .18s;display:inline-block;}
 .vweek-card.collapsed .vweek-chevron{transform:rotate(-90deg);}
-.vweek-totals{display:flex;gap:1.1rem;font-size:.78rem;color:var(--grey-400);}
-.vweek-totals strong{color:var(--primary);font-weight:800;}
+.vweek-totals{display:flex;gap:.9rem;align-items:center;font-size:.74rem;color:var(--grey-400);flex-wrap:wrap;}
+.vweek-totals strong{color:var(--primary);font-weight:800;font-size:.82rem;}
 .vweek-body{border-top:1px solid var(--grey-100);}
 .vweek-card.collapsed .vweek-body{display:none;}
-.vweek-del{background:none;border:none;color:var(--grey-300);cursor:pointer;font-size:.85rem;padding:.2rem .4rem;border-radius:6px;}
-.vweek-del:hover{background:var(--red-light);color:var(--red);}
-.vweek-label-edit{cursor:text;border-bottom:1.5px dashed var(--grey-300);padding-bottom:1px;}
+.vweek-del{background:none;border:none;color:var(--grey-200);cursor:pointer;font-size:.85rem;padding:.25rem .45rem;border-radius:7px;transition:all .12s;line-height:1;}
+.vweek-del:hover{background:var(--red-light);color:var(--red);transform:scale(1.1);}
+.vweek-label-edit{cursor:text;border-bottom:1.5px dashed var(--grey-300);padding-bottom:1px;transition:color .12s;}
 .vweek-label-edit:hover{color:var(--primary);border-color:var(--primary);}
 
 /* Month grouping cards — contain multiple week cards */
-.vmonth-card{background:var(--grey-50);border-radius:var(--r);margin-bottom:1.25rem;overflow:hidden;border:1.5px solid var(--grey-100);}
-.vmonth-hdr{display:flex;align-items:center;justify-content:space-between;padding:1rem 1.25rem;cursor:pointer;user-select:none;background:var(--white);}
+.vmonth-card{background:linear-gradient(180deg,var(--grey-50) 0%,rgba(247,247,250,.4) 100%);border-radius:16px;margin-bottom:1.5rem;overflow:hidden;border:1px solid var(--grey-100);}
+.vmonth-hdr{display:flex;align-items:center;justify-content:space-between;padding:1.1rem 1.4rem;cursor:pointer;user-select:none;background:var(--white);gap:1rem;flex-wrap:wrap;border-bottom:1px solid transparent;}
 .vmonth-hdr:hover{background:var(--grey-50);}
-.vmonth-title{display:flex;align-items:center;gap:.6rem;font-weight:800;font-size:1.05rem;color:var(--grey-900);}
+.vmonth-card:not(.collapsed) .vmonth-hdr{border-bottom-color:var(--grey-100);}
+.vmonth-title{display:flex;align-items:center;gap:.6rem;font-weight:800;font-size:1.1rem;color:var(--grey-900);letter-spacing:-.01em;}
 .vmonth-card.collapsed .vweek-chevron{transform:rotate(-90deg);}
-.vmonth-totals{display:flex;gap:1rem;align-items:center;font-size:.8rem;color:var(--grey-400);}
-.vmonth-totals strong{color:var(--primary);font-weight:800;}
-.vmonth-body{padding:1rem 1.25rem;}
+.vmonth-totals{display:flex;gap:1rem;align-items:center;font-size:.82rem;color:var(--grey-400);}
+.vmonth-totals strong{color:var(--primary);font-weight:800;font-size:.95rem;}
+.vmonth-body{padding:1.1rem 1.25rem 1.25rem;}
 .vmonth-card.collapsed .vmonth-body{display:none;}
+
 table{width:100%;border-collapse:collapse;font-size:.85rem;background:var(--white);}
 thead th{background:var(--grey-50);padding:.6rem .9rem;text-align:left;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--grey-400);border-bottom:1.5px solid var(--grey-100);}
 tbody tr{border-bottom:1px solid var(--grey-100);transition:background .12s;}
@@ -607,19 +628,22 @@ details.card>summary::-webkit-details-marker{display:none;}
         <!-- Week selector — switch between uploaded weeks -->
         <div class="week-bar" style="margin-bottom:1.1rem;flex-wrap:wrap" id="analytics-week-bar"></div>
 
+        <!-- Quick stat cards -->
+        <div id="analytics-stat-cards" style="display:grid;grid-template-columns:repeat(4,1fr);gap:.85rem;margin-bottom:1.25rem"></div>
+
         <!-- Per-agent totals for selected week -->
         <div class="card">
-          <div class="card-title">📋 Tickets Reviewed Per Agent <span style="font-weight:400;color:var(--grey-400);font-size:.78rem;margin-left:.4rem" id="analytics-summary"></span></div>
+          <div class="card-title">📋 Tickets reviewed per agent <span style="font-weight:400;color:var(--grey-400);font-size:.78rem;margin-left:.4rem" id="analytics-summary"></span></div>
           <div class="tbl-wrap"><table id="atbl-volume" class="atbl"></table></div>
         </div>
 
         <!-- Good / Bad / Advice — stacked, full width, no overflow -->
         <div class="card">
-          <div class="card-title" style="color:var(--success)">😊 Good Ratings</div>
+          <div class="card-title" style="color:var(--success)">😊 Good ratings</div>
           <div class="tbl-wrap"><table id="atbl-good" class="atbl atbl-good"></table></div>
         </div>
         <div class="card">
-          <div class="card-title" style="color:var(--red)">😞 Bad Ratings</div>
+          <div class="card-title" style="color:var(--red)">😞 Bad ratings</div>
           <div class="tbl-wrap"><table id="atbl-bad" class="atbl atbl-bad"></table></div>
         </div>
         <div class="card">
@@ -2272,8 +2296,39 @@ function renderAnalyticsReport(){
   renderSingleRowTable('atbl-bad',agents,bad,'Total Bad','atbl-bad');
   renderSingleRowTable('atbl-advice',agents,advice,'Total Advice','atbl-advice');
 
-  // Summary text
+  // ── Quick stat cards ──
   const totalAll=Object.values(totals).reduce((a,b)=>a+b,0);
+  const totalGood=Object.values(good).reduce((a,b)=>a+b,0);
+  const totalBad=Object.values(bad).reduce((a,b)=>a+b,0);
+  const totalAdvice=Object.values(advice).reduce((a,b)=>a+b,0);
+  const goodPct=totalAll?Math.round(totalGood/totalAll*100):0;
+
+  const statCards=el('analytics-stat-cards');
+  if(statCards){
+    statCards.innerHTML=`
+      <div class="astat-card">
+        <div class="astat-label">📋 Total Reviewed</div>
+        <div class="astat-value" style="color:var(--grey-900)">${totalAll}</div>
+        <div class="astat-sub">${agents.length} agents</div>
+      </div>
+      <div class="astat-card">
+        <div class="astat-label">😊 Good</div>
+        <div class="astat-value" style="color:var(--success)">${totalGood}</div>
+        <div class="astat-sub">${goodPct}% of reviewed</div>
+      </div>
+      <div class="astat-card">
+        <div class="astat-label">😞 Bad</div>
+        <div class="astat-value" style="color:var(--red)">${totalBad}</div>
+        <div class="astat-sub">${totalAll?Math.round(totalBad/totalAll*100):0}% of reviewed</div>
+      </div>
+      <div class="astat-card">
+        <div class="astat-label">💡 Advice</div>
+        <div class="astat-value" style="color:var(--amber)">${totalAdvice}</div>
+        <div class="astat-sub">${totalAll?Math.round(totalAdvice/totalAll*100):0}% of reviewed</div>
+      </div>`;
+  }
+
+  // Summary text
   el('analytics-summary').textContent=`${analyticsCurrentWeek} · ${totalAll} tickets · ${agents.length} agents`;
 
   // Flagged tickets list
@@ -2318,21 +2373,25 @@ function renderFlaggedTicketsFiltered(){
   const list=filterVal?currentFlaggedTickets.filter(t=>t.agent===filterVal):currentFlaggedTickets;
 
   if(!list.length){
-    wrap.innerHTML='<div style="padding:1rem;text-align:center;color:var(--grey-400);font-size:.85rem">'+
-      (filterVal?'No flagged tickets for '+filterVal+' this week.':'No bad or advice-flagged tickets this week 🎉')+'</div>';
+    wrap.innerHTML='<div class="empty" style="padding:2rem 1rem"><div class="empty-icon">🎉</div>'+
+      (filterVal?'No flagged tickets for '+filterVal+' this week.':'No bad or advice-flagged tickets this week.')+'</div>';
     return;
   }
   wrap.innerHTML=list.map(t=>{
     const isBad=t.cls==='bad';
     const clr=isBad?'var(--red)':'var(--amber)';
     const bg=isBad?'var(--red-light)':'var(--amber-light)';
+    const bdr=isBad?'var(--red)':'var(--amber)';
     const icon=isBad?'😞':'💡';
     const zendeskUrl='https://whishaftersales.zendesk.com/agent/tickets/'+encodeURIComponent(t.ticketRef);
-    return `<div style="display:flex;gap:.75rem;align-items:flex-start;padding:.65rem .9rem;border-radius:var(--r2);background:${bg};margin-bottom:.5rem">
-      <span style="font-size:1rem">${icon}</span>
-      <div style="flex:1">
-        <div style="font-size:.8rem;font-weight:700;color:var(--grey-900)">${t.agent} <span style="font-weight:400;color:var(--grey-400)">· </span><a href="${zendeskUrl}" target="_blank" rel="noopener" style="color:var(--blue);text-decoration:underline;font-weight:600">#${t.ticketRef}</a></div>
-        ${t.comment?`<div style="font-size:.8rem;color:${clr};margin-top:2px">${t.comment}</div>`:''}
+    return `<div style="display:flex;gap:.7rem;align-items:flex-start;padding:.75rem .95rem;border-radius:10px;background:${bg};margin-bottom:.55rem;border-left:3px solid ${bdr};transition:transform .12s" onmouseover="this.style.transform='translateX(2px)'" onmouseout="this.style.transform=''">
+      <span style="font-size:1.1rem;line-height:1;margin-top:1px">${icon}</span>
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:.4rem;flex-wrap:wrap">
+          <span style="font-size:.82rem;font-weight:800;color:var(--grey-900)">${t.agent}</span>
+          <a href="${zendeskUrl}" target="_blank" rel="noopener" style="color:var(--blue);font-weight:700;font-size:.78rem;background:rgba(37,99,235,.08);padding:.1rem .5rem;border-radius:100px;text-decoration:none">#${t.ticketRef} ↗</a>
+        </div>
+        ${t.comment?`<div style="font-size:.82rem;color:${clr};margin-top:.3rem;line-height:1.4">${t.comment}</div>`:''}
       </div>
     </div>`;
   }).join('');
