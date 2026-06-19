@@ -336,6 +336,19 @@ select option{background:var(--white);}
 .vweek-card.collapsed .vweek-body{display:none;}
 .vweek-del{background:none;border:none;color:var(--grey-300);cursor:pointer;font-size:.85rem;padding:.2rem .4rem;border-radius:6px;}
 .vweek-del:hover{background:var(--red-light);color:var(--red);}
+.vweek-label-edit{cursor:text;border-bottom:1.5px dashed var(--grey-300);padding-bottom:1px;}
+.vweek-label-edit:hover{color:var(--primary);border-color:var(--primary);}
+
+/* Month grouping cards — contain multiple week cards */
+.vmonth-card{background:var(--grey-50);border-radius:var(--r);margin-bottom:1.25rem;overflow:hidden;border:1.5px solid var(--grey-100);}
+.vmonth-hdr{display:flex;align-items:center;justify-content:space-between;padding:1rem 1.25rem;cursor:pointer;user-select:none;background:var(--white);}
+.vmonth-hdr:hover{background:var(--grey-50);}
+.vmonth-title{display:flex;align-items:center;gap:.6rem;font-weight:800;font-size:1.05rem;color:var(--grey-900);}
+.vmonth-card.collapsed .vweek-chevron{transform:rotate(-90deg);}
+.vmonth-totals{display:flex;gap:1rem;align-items:center;font-size:.8rem;color:var(--grey-400);}
+.vmonth-totals strong{color:var(--primary);font-weight:800;}
+.vmonth-body{padding:1rem 1.25rem;}
+.vmonth-card.collapsed .vmonth-body{display:none;}
 table{width:100%;border-collapse:collapse;font-size:.85rem;background:var(--white);}
 thead th{background:var(--grey-50);padding:.6rem .9rem;text-align:left;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--grey-400);border-bottom:1.5px solid var(--grey-100);}
 tbody tr{border-bottom:1px solid var(--grey-100);transition:background .12s;}
@@ -549,7 +562,10 @@ details.card>summary::-webkit-details-marker{display:none;}
       <!-- ═══ SECTION 1: MANUAL DAILY TICKET VOLUME ═══ -->
       <div class="analytics-section-hdr">
         <div><div class="analytics-section-title">📋 Tickets Handled</div><div class="analytics-section-sub">Daily count per agent — click any number to edit</div></div>
-        <button class="btn btn-green btn-sm" id="btn-vol-addweek">+ Add Week</button>
+        <div class="btn-row">
+          <button class="btn btn-white btn-sm" id="btn-vol-addmonth">+ Add Month</button>
+          <button class="btn btn-green btn-sm" id="btn-vol-addweek">+ Add Week</button>
+        </div>
       </div>
       <div id="volume-weeks-wrap"></div>
 
@@ -607,7 +623,12 @@ details.card>summary::-webkit-details-marker{display:none;}
 
         <!-- Detailed ticket list per agent -->
         <div class="card">
-          <div class="card-title">🎫 Flagged Tickets <span style="font-weight:400;color:var(--grey-400);font-size:.78rem;margin-left:.4rem">bad &amp; advice comments only</span></div>
+          <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem">
+            <span>🎫 Flagged Tickets <span style="font-weight:400;color:var(--grey-400);font-size:.78rem;margin-left:.4rem">bad &amp; advice comments only</span></span>
+            <select id="analytics-flagged-filter" style="height:30px;font-size:.78rem;padding:0 .6rem;border-radius:100px;border:1.5px solid var(--grey-200);background:var(--white);color:var(--grey-600);cursor:pointer">
+              <option value="">All agents</option>
+            </select>
+          </div>
           <div id="analytics-flagged-list"></div>
         </div>
 
@@ -1643,16 +1664,31 @@ async function assignTasksAndSave(){
 let analyticsWeeks={};      // {weekLabel: {agentData: {agentName: [{ticketRef,comment,rating}]}, uploadedAt}}
 let analyticsCurrentWeek='';
 
-// ── Manual daily ticket-volume table ──
-// Structure: weeks = ['Week 1','Week 2',...]
-// volumeData = { weekLabel: { dayIndex(0-6): { agentName: count } } }
+// ── Manual daily ticket-volume table, grouped by month ──
+// Structure: months = ['2026-06', '2026-07', ...] (sorted)
+// volumeWeeksByMonth = { monthKey: [weekId, weekId, ...] }
+// volumeWeekMeta = { weekId: {label: 'Week 1'} }  — label is editable, weekId is stable
+// volumeData = { weekId: { dayIdx(0-6): { agentName: count } } }
 const VOL_DAYS=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
-let volumeWeeks=[];     // ordered list of week labels
-let volumeData={};      // {weekLabel: {dayIdx: {agentName: count}}}
-let volumeCollapsed={}; // {weekLabel: true/false} — true = collapsed
+let volumeMonths=[];        // ordered list of month keys 'YYYY-MM'
+let volumeWeeksByMonth={};  // {monthKey: [weekId,...]}
+let volumeWeekMeta={};      // {weekId: {label}}
+let volumeData={};          // {weekId: {dayIdx: {agentName: count}}}
+let volumeCollapsed={};     // {weekId: true/false}
+let monthCollapsed={};      // {monthKey: true/false}
 
 function getVolumeAgents(){
   return emps.map(e=>e.name);
+}
+
+function monthLabel(monthKey){
+  const [y,m]=monthKey.split('-').map(Number);
+  return new Date(y,m-1,1).toLocaleDateString('en-GB',{month:'long',year:'numeric'});
+}
+
+function currentMonthKey(){
+  const d=new Date();
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
 }
 
 async function loadVolumeFromFirestore(){
@@ -1660,7 +1696,9 @@ async function loadVolumeFromFirestore(){
     const doc=await _db.collection('analytics').doc('volumeData').get();
     if(doc.exists){
       const d=doc.data();
-      volumeWeeks=d.weeks?JSON.parse(d.weeks):[];
+      volumeMonths=d.months?JSON.parse(d.months):[];
+      volumeWeeksByMonth=d.weeksByMonth?JSON.parse(d.weeksByMonth):{};
+      volumeWeekMeta=d.weekMeta?JSON.parse(d.weekMeta):{};
       volumeData=d.data?JSON.parse(d.data):{};
     }
   }catch(e){console.error('Could not load volume data:',e.message);}
@@ -1668,34 +1706,100 @@ async function loadVolumeFromFirestore(){
 }
 
 async function saveVolumeToFirestore(){
+  await _db.collection('analytics').doc('volumeData').set({
+    months:JSON.stringify(volumeMonths),
+    weeksByMonth:JSON.stringify(volumeWeeksByMonth),
+    weekMeta:JSON.stringify(volumeWeekMeta),
+    data:JSON.stringify(volumeData)
+  });
+}
+
+function ensureMonth(monthKey){
+  if(!volumeMonths.includes(monthKey)){
+    volumeMonths.push(monthKey);
+    volumeMonths.sort();
+    volumeWeeksByMonth[monthKey]=[];
+  }
+}
+
+function addVolumeMonth(){
+  // Simple native prompt using a month input via a temporary element
+  const input=document.createElement('input');
+  input.type='month';
+  input.value=currentMonthKey();
+  input.style.position='fixed';input.style.opacity='0';
+  document.body.appendChild(input);
+  input.addEventListener('change',async()=>{
+    if(input.value){
+      ensureMonth(input.value);
+      try{
+        await saveVolumeToFirestore();
+        toast('✅ '+monthLabel(input.value)+' added','ok');
+      }catch(e){toast('Error: '+e.message,'err');}
+      renderVolumeTable();
+    }
+    input.remove();
+  });
+  input.click();
+  input.showPicker?input.showPicker():input.focus();
+}
+
+async function addVolumeWeek(monthKey){
+  monthKey=monthKey||currentMonthKey();
+  ensureMonth(monthKey);
+  const weekNum=volumeWeeksByMonth[monthKey].length+1;
+  const weekId='w_'+monthKey+'_'+Date.now();
+  const label='Week '+weekNum;
+  volumeWeeksByMonth[monthKey].push(weekId);
+  volumeWeekMeta[weekId]={label};
+  volumeData[weekId]={};
   try{
-    await _db.collection('analytics').doc('volumeData').set({
-      weeks:JSON.stringify(volumeWeeks),
-      data:JSON.stringify(volumeData)
-    });
-  }catch(e){console.error('Could not save volume data:',e.message);}
-}
-
-function addVolumeWeek(){
-  const nextNum=volumeWeeks.length+1;
-  const label='Week '+nextNum;
-  if(volumeWeeks.includes(label)){toast('Week already exists','err');return;}
-  volumeWeeks.push(label);
-  volumeData[label]={};
-  saveVolumeToFirestore();
+    await saveVolumeToFirestore();
+    toast('✅ '+label+' added to '+monthLabel(monthKey),'ok');
+  }catch(e){
+    toast('Error saving: '+e.message,'err');
+    volumeWeeksByMonth[monthKey].pop();
+    delete volumeWeekMeta[weekId];delete volumeData[weekId];
+  }
   renderVolumeTable();
 }
 
-async function removeVolumeWeek(label){
+async function removeVolumeWeek(monthKey,weekId){
+  const label=volumeWeekMeta[weekId]?.label||'this week';
   if(!confirm('Remove "'+label+'" and all its daily data?'))return;
-  volumeWeeks=volumeWeeks.filter(w=>w!==label);
-  delete volumeData[label];
-  await saveVolumeToFirestore();
+  const backup={months:[...volumeMonths],wbm:JSON.parse(JSON.stringify(volumeWeeksByMonth)),meta:{...volumeWeekMeta},data:{...volumeData}};
+  volumeWeeksByMonth[monthKey]=volumeWeeksByMonth[monthKey].filter(id=>id!==weekId);
+  delete volumeWeekMeta[weekId];delete volumeData[weekId];
+  try{
+    await saveVolumeToFirestore();
+  }catch(e){
+    toast('Error saving: '+e.message,'err');
+    volumeMonths=backup.months;volumeWeeksByMonth=backup.wbm;volumeWeekMeta=backup.meta;volumeData=backup.data;
+  }
   renderVolumeTable();
 }
 
-function toggleVolumeWeek(label){
-  volumeCollapsed[label]=!volumeCollapsed[label];
+function toggleVolumeWeek(weekId){
+  volumeCollapsed[weekId]=!volumeCollapsed[weekId];
+  renderVolumeTable();
+}
+
+function toggleVolumeMonth(monthKey){
+  monthCollapsed[monthKey]=!monthCollapsed[monthKey];
+  renderVolumeTable();
+}
+
+async function renameVolumeWeek(weekId,newLabel){
+  newLabel=newLabel.trim();
+  if(!newLabel) return;
+  const oldLabel=volumeWeekMeta[weekId]?.label;
+  volumeWeekMeta[weekId]={label:newLabel};
+  try{
+    await saveVolumeToFirestore();
+  }catch(e){
+    toast('Error saving: '+e.message,'err');
+    volumeWeekMeta[weekId]={label:oldLabel};
+  }
   renderVolumeTable();
 }
 
@@ -1708,87 +1812,147 @@ function renderVolumeTable(){
     wrap.innerHTML='<div class="empty"><div class="empty-icon">👥</div>Add employees first to track volume.</div>';
     return;
   }
-  if(!volumeWeeks.length){
-    wrap.innerHTML='<div class="empty"><div class="empty-icon">📋</div>No weeks added yet — click "+ Add Week" to start.</div>';
+  if(!volumeMonths.length){
+    wrap.innerHTML='<div class="empty"><div class="empty-icon">📋</div>No months added yet — click "+ Add Week" to start.</div>';
     return;
   }
 
-  wrap.innerHTML=volumeWeeks.map(w=>{
-    const collapsed=!!volumeCollapsed[w];
-    const weekData=volumeData[w]||{};
+  // Render newest month first
+  const sortedMonths=[...volumeMonths].sort().reverse();
 
-    // Compute weekly totals per agent + grand total
-    const agentTotals={};agents.forEach(a=>agentTotals[a]=0);
-    let grand=0;
-    VOL_DAYS.forEach((d,di)=>{
-      agents.forEach(a=>{
-        const v=weekData[di]?.[a]||0;
-        agentTotals[a]+=v;grand+=v;
+  wrap.innerHTML=sortedMonths.map(monthKey=>{
+    const weekIds=volumeWeeksByMonth[monthKey]||[];
+    const mCollapsed=!!monthCollapsed[monthKey];
+
+    const weeksHtml=weekIds.map(weekId=>{
+      const label=volumeWeekMeta[weekId]?.label||'Week';
+      const collapsed=!!volumeCollapsed[weekId];
+      const weekData=volumeData[weekId]||{};
+
+      const agentTotals={};agents.forEach(a=>agentTotals[a]=0);
+      let grand=0;
+      VOL_DAYS.forEach((d,di)=>{
+        agents.forEach(a=>{
+          const v=weekData[di]?.[a]||0;
+          agentTotals[a]+=v;grand+=v;
+        });
       });
-    });
 
-    // Daily grid rows
-    let gridRows=VOL_DAYS.map((d,di)=>{
-      let rowTotal=0;
-      const cells=agents.map(a=>{
-        const v=weekData[di]?.[a];
-        rowTotal+=(v||0);
-        return `<td class="editable-cell" data-vweek="${w}" data-vday="${di}" data-vagent="${a}">${v!=null?v:''}</td>`;
+      let gridRows=VOL_DAYS.map((d,di)=>{
+        let rowTotal=0;
+        const cells=agents.map(a=>{
+          const v=weekData[di]?.[a];
+          rowTotal+=(v||0);
+          return `<td class="editable-cell" data-vweekid="${weekId}" data-vday="${di}" data-vagent="${a}">${v!=null?v:''}</td>`;
+        }).join('');
+        return `<tr><td class="row-label">${d}</td>${cells}<td style="font-weight:800;background:var(--grey-50)">${rowTotal||''}</td></tr>`;
       }).join('');
-      return `<tr><td class="row-label">${d}</td>${cells}<td style="font-weight:800;background:var(--grey-50)">${rowTotal||''}</td></tr>`;
+
+      const totalRow=`<tr class="total-row"><td class="row-label">Total</td>`+
+        agents.map(a=>`<td>${agentTotals[a]}</td>`).join('')+
+        `<td>${grand}</td></tr>`;
+
+      return `<div class="vweek-card${collapsed?' collapsed':''}">
+        <div class="vweek-hdr" data-toggleweekid="${weekId}">
+          <div class="vweek-title">
+            <span class="vweek-chevron">▾</span>
+            <span class="vweek-label-edit" data-editweekid="${weekId}" data-curlabel="${label}" title="Click to rename">${label} ✎</span>
+          </div>
+          <div class="vweek-totals">
+            ${agents.map(a=>`<span>${a.split(' ')[0]}: <strong>${agentTotals[a]}</strong></span>`).join('')}
+            <span>Total: <strong>${grand}</strong></span>
+            <button class="vweek-del" data-delweekid="${weekId}" data-delmonth="${monthKey}" title="Remove week">✕</button>
+          </div>
+        </div>
+        <div class="vweek-body">
+          <div class="tbl-wrap" style="box-shadow:none;border-radius:0">
+            <table class="atbl">
+              <thead><tr><th class="row-hdr">Day</th>${agents.map(a=>`<th>${a}</th>`).join('')}<th>Total</th></tr></thead>
+              <tbody>${gridRows}${totalRow}</tbody>
+            </table>
+          </div>
+        </div>
+      </div>`;
     }).join('');
 
-    const totalRow=`<tr class="total-row"><td class="row-label">Total</td>`+
-      agents.map(a=>`<td>${agentTotals[a]}</td>`).join('')+
-      `<td>${grand}</td></tr>`;
+    // Month grand total across all its weeks
+    let monthGrand=0;
+    weekIds.forEach(wid=>{
+      const wd=volumeData[wid]||{};
+      VOL_DAYS.forEach((d,di)=>agents.forEach(a=>monthGrand+=(wd[di]?.[a]||0)));
+    });
 
-    return `<div class="vweek-card${collapsed?' collapsed':''}">
-      <div class="vweek-hdr" data-toggleweek="${w}">
-        <div class="vweek-title"><span class="vweek-chevron">▾</span> ${w}</div>
-        <div class="vweek-totals">
-          ${agents.map(a=>`<span>${a.split(' ')[0]}: <strong>${agentTotals[a]}</strong></span>`).join('')}
-          <span>Total: <strong>${grand}</strong></span>
-          <button class="vweek-del" data-delweek="${w}" title="Remove week">✕</button>
+    return `<div class="vmonth-card${mCollapsed?' collapsed':''}">
+      <div class="vmonth-hdr" data-togglemonth="${monthKey}">
+        <div class="vmonth-title"><span class="vweek-chevron">▾</span> 📅 ${monthLabel(monthKey)}</div>
+        <div class="vmonth-totals"><span>${weekIds.length} week${weekIds.length!==1?'s':''} · Total: <strong>${monthGrand}</strong></span>
+          <button class="btn btn-white btn-xs" data-addweektomonth="${monthKey}" onclick="event.stopPropagation()">+ Add Week</button>
         </div>
       </div>
-      <div class="vweek-body">
-        <div class="tbl-wrap" style="box-shadow:none;border-radius:0">
-          <table class="atbl">
-            <thead><tr><th class="row-hdr">Day</th>${agents.map(a=>`<th>${a}</th>`).join('')}<th>Total</th></tr></thead>
-            <tbody>${gridRows}${totalRow}</tbody>
-          </table>
-        </div>
-      </div>
+      <div class="vmonth-body">${weeksHtml||'<div class="empty" style="padding:1.5rem"><div class="empty-icon">📋</div>No weeks in this month yet.</div>'}</div>
     </div>`;
   }).join('');
 
-  // Wire week header toggle
-  wrap.querySelectorAll('[data-toggleweek]').forEach(hdr=>{
+  // Wire month toggle
+  wrap.querySelectorAll('[data-togglemonth]').forEach(hdr=>{
     hdr.addEventListener('click',e=>{
-      if(e.target.closest('[data-delweek]')) return;
-      toggleVolumeWeek(hdr.dataset.toggleweek);
+      if(e.target.closest('[data-addweektomonth]')) return;
+      toggleVolumeMonth(hdr.dataset.togglemonth);
+    });
+  });
+  // Wire add-week-to-month buttons
+  wrap.querySelectorAll('[data-addweektomonth]').forEach(btn=>{
+    btn.addEventListener('click',e=>{e.stopPropagation();addVolumeWeek(btn.dataset.addweektomonth);});
+  });
+  // Wire week header toggle
+  wrap.querySelectorAll('[data-toggleweekid]').forEach(hdr=>{
+    hdr.addEventListener('click',e=>{
+      if(e.target.closest('[data-delweekid]')||e.target.closest('[data-editweekid]')) return;
+      toggleVolumeWeek(hdr.dataset.toggleweekid);
     });
   });
   // Wire delete week
-  wrap.querySelectorAll('[data-delweek]').forEach(btn=>{
-    btn.addEventListener('click',e=>{e.stopPropagation();removeVolumeWeek(btn.dataset.delweek);});
+  wrap.querySelectorAll('[data-delweekid]').forEach(btn=>{
+    btn.addEventListener('click',e=>{e.stopPropagation();removeVolumeWeek(btn.dataset.delmonth,btn.dataset.delweekid);});
+  });
+  // Wire label rename (click to edit)
+  wrap.querySelectorAll('[data-editweekid]').forEach(labelEl=>{
+    labelEl.addEventListener('click',function(e){
+      e.stopPropagation();
+      const weekId=labelEl.dataset.editweekid;
+      const curLabel=labelEl.dataset.curlabel;
+      const input=document.createElement('input');
+      input.type='text';input.value=curLabel;
+      input.style.cssText='font-size:.95rem;font-weight:800;border:1.5px solid var(--primary);border-radius:6px;padding:.1rem .4rem;width:160px;font-family:inherit';
+      labelEl.replaceWith(input);
+      input.focus();input.select();
+      const commit=()=>{renameVolumeWeek(weekId,input.value);};
+      input.addEventListener('blur',commit);
+      input.addEventListener('keydown',ev=>{if(ev.key==='Enter'){ev.preventDefault();input.blur();}});
+    });
   });
   // Wire editable cells
   wrap.querySelectorAll('.editable-cell').forEach(cell=>{
     cell.addEventListener('click',function(e){
       e.stopPropagation();
       if(cell.querySelector('input')) return;
-      const week=cell.dataset.vweek,day=cell.dataset.vday,agent=cell.dataset.vagent;
-      const curVal=volumeData[week]?.[day]?.[agent]||'';
+      const weekId=cell.dataset.vweekid,day=cell.dataset.vday,agent=cell.dataset.vagent;
+      const curVal=volumeData[weekId]?.[day]?.[agent]||'';
       cell.innerHTML=`<input type="number" min="0" value="${curVal}">`;
       const input=cell.querySelector('input');
       input.focus();input.select();
-      const commit=()=>{
+      const commit=async()=>{
         const val=parseInt(input.value,10);
-        if(!volumeData[week]) volumeData[week]={};
-        if(!volumeData[week][day]) volumeData[week][day]={};
-        volumeData[week][day][agent]=isNaN(val)?0:val;
-        saveVolumeToFirestore();
+        if(!volumeData[weekId]) volumeData[weekId]={};
+        if(!volumeData[weekId][day]) volumeData[weekId][day]={};
+        const prevVal=volumeData[weekId][day][agent];
+        volumeData[weekId][day][agent]=isNaN(val)?0:val;
+        try{
+          await saveVolumeToFirestore();
+        }catch(err){
+          toast('Error saving: '+err.message,'err');
+          volumeData[weekId][day][agent]=prevVal;
+        }
         renderVolumeTable();
       };
       input.addEventListener('blur',commit);
@@ -1863,7 +2027,7 @@ function handleAnalyticsFile(file){
   el('analytics-upload-zone').style.display='none';
 
   const reader=new FileReader();
-  reader.onload=function(e){
+  reader.onload=async function(e){
     try{
       const data=new Uint8Array(e.target.result);
       const wb=XLSX.read(data,{type:'array',cellDates:true});
@@ -1884,8 +2048,8 @@ function handleAnalyticsFile(file){
       analyticsWeeks[weekLabel]={agentData,uploadedAt:Date.now()};
       analyticsCurrentWeek=weekLabel;
 
-      // Persist to Firestore so it survives refresh
-      saveAnalyticsToFirestore();
+      // Persist to Firestore so it survives refresh — await it so we know it actually saved
+      await saveAnalyticsToFirestore();
 
       el('analytics-loading').style.display='none';
       el('analytics-report').style.display='block';
@@ -1895,6 +2059,7 @@ function handleAnalyticsFile(file){
 
       renderAnalyticsWeekBar();
       renderAnalyticsReport();
+      toast('✅ '+weekLabel+' saved!','ok');
 
     }catch(err){
       el('analytics-loading').style.display='none';
@@ -1913,9 +2078,7 @@ function handleAnalyticsFile(file){
 }
 
 async function saveAnalyticsToFirestore(){
-  try{
-    await _db.collection('analytics').doc('weeklyData').set({weeks:JSON.stringify(analyticsWeeks)});
-  }catch(e){console.error('Could not save analytics:',e.message);}
+  await _db.collection('analytics').doc('weeklyData').set({weeks:JSON.stringify(analyticsWeeks)});
 }
 
 async function loadAnalyticsFromFirestore(){
@@ -1950,7 +2113,7 @@ function renderAnalyticsWeekBar(){
   const labels=Object.keys(analyticsWeeks).sort((a,b)=>(analyticsWeeks[a].uploadedAt||0)-(analyticsWeeks[b].uploadedAt||0));
   if(!labels.length){bar.innerHTML='';return;}
   bar.innerHTML='<span class="wk-lbl">Week:</span>'+
-    labels.map(l=>`<div class="wk-chip${l===analyticsCurrentWeek?' active':''}" data-aweek="${l}">${l}</div>`).join('')+
+    labels.map(l=>`<div class="wk-chip${l===analyticsCurrentWeek?' active':''}" data-aweek="${l}" title="Double-click to rename">${l}</div>`).join('')+
     '<button class="btn btn-ghost btn-xs" id="btn-analytics-delweek" style="margin-left:.5rem">🗑 Delete this week</button>';
 
   bar.querySelectorAll('[data-aweek]').forEach(chip=>{
@@ -1958,6 +2121,27 @@ function renderAnalyticsWeekBar(){
       analyticsCurrentWeek=chip.dataset.aweek;
       renderAnalyticsWeekBar();
       renderAnalyticsReport();
+    });
+    chip.addEventListener('dblclick',e=>{
+      e.stopPropagation();
+      const oldLabel=chip.dataset.aweek;
+      const input=document.createElement('input');
+      input.type='text';input.value=oldLabel;
+      input.style.cssText='font-size:.78rem;font-weight:600;border:1.5px solid var(--primary);border-radius:100px;padding:.3rem .85rem;width:160px;font-family:inherit';
+      chip.replaceWith(input);
+      input.focus();input.select();
+      const commit=async()=>{
+        const newLabel=input.value.trim();
+        if(newLabel&&newLabel!==oldLabel&&!analyticsWeeks[newLabel]){
+          analyticsWeeks[newLabel]=analyticsWeeks[oldLabel];
+          delete analyticsWeeks[oldLabel];
+          if(analyticsCurrentWeek===oldLabel) analyticsCurrentWeek=newLabel;
+          try{await saveAnalyticsToFirestore();}catch(err){toast('Error: '+err.message,'err');}
+        }
+        renderAnalyticsWeekBar();
+      };
+      input.addEventListener('blur',commit);
+      input.addEventListener('keydown',ev=>{if(ev.key==='Enter'){ev.preventDefault();input.blur();}});
     });
   });
   const delBtn=el('btn-analytics-delweek');
@@ -2052,21 +2236,45 @@ function renderSingleRowTable(tblId,agents,dataObj,rowLabel,extraClass){
   tbl.innerHTML=html;
 }
 
+let currentFlaggedTickets=[]; // stored so the agent filter can re-render without recomputing
+
 function renderFlaggedTickets(flaggedTickets){
+  currentFlaggedTickets=flaggedTickets;
+
+  // Populate agent filter dropdown
+  const filterSel=el('analytics-flagged-filter');
+  if(filterSel){
+    const agentsInList=[...new Set(flaggedTickets.map(t=>t.agent))].sort();
+    const curVal=filterSel.value;
+    filterSel.innerHTML='<option value="">All agents</option>'+
+      agentsInList.map(a=>`<option value="${a}">${a}</option>`).join('');
+    if(agentsInList.includes(curVal)) filterSel.value=curVal;
+    filterSel.onchange=()=>renderFlaggedTicketsFiltered();
+  }
+
+  renderFlaggedTicketsFiltered();
+}
+
+function renderFlaggedTicketsFiltered(){
   const wrap=el('analytics-flagged-list');
-  if(!flaggedTickets.length){
-    wrap.innerHTML='<div style="padding:1rem;text-align:center;color:var(--grey-400);font-size:.85rem">No bad or advice-flagged tickets this week 🎉</div>';
+  const filterVal=el('analytics-flagged-filter')?.value||'';
+  const list=filterVal?currentFlaggedTickets.filter(t=>t.agent===filterVal):currentFlaggedTickets;
+
+  if(!list.length){
+    wrap.innerHTML='<div style="padding:1rem;text-align:center;color:var(--grey-400);font-size:.85rem">'+
+      (filterVal?'No flagged tickets for '+filterVal+' this week.':'No bad or advice-flagged tickets this week 🎉')+'</div>';
     return;
   }
-  wrap.innerHTML=flaggedTickets.map(t=>{
+  wrap.innerHTML=list.map(t=>{
     const isBad=t.cls==='bad';
     const clr=isBad?'var(--red)':'var(--amber)';
     const bg=isBad?'var(--red-light)':'var(--amber-light)';
     const icon=isBad?'😞':'💡';
+    const zendeskUrl='https://whishaftersales.zendesk.com/agent/tickets/'+encodeURIComponent(t.ticketRef);
     return `<div style="display:flex;gap:.75rem;align-items:flex-start;padding:.65rem .9rem;border-radius:var(--r2);background:${bg};margin-bottom:.5rem">
       <span style="font-size:1rem">${icon}</span>
       <div style="flex:1">
-        <div style="font-size:.8rem;font-weight:700;color:var(--grey-900)">${t.agent} <span style="font-weight:400;color:var(--grey-400)">· #${t.ticketRef}</span></div>
+        <div style="font-size:.8rem;font-weight:700;color:var(--grey-900)">${t.agent} <span style="font-weight:400;color:var(--grey-400)">· </span><a href="${zendeskUrl}" target="_blank" rel="noopener" style="color:var(--blue);text-decoration:underline;font-weight:600">#${t.ticketRef}</a></div>
         ${t.comment?`<div style="font-size:.8rem;color:${clr};margin-top:2px">${t.comment}</div>`:''}
       </div>
     </div>`;
@@ -3293,7 +3501,10 @@ window.go=go; window.setView=setView; window.openNewWeekModal=openNewWeekModal;
 window.createWeek=createWeek; window.publishWeek=publishWeek;
 window.assignTasksAndSave=assignTasksAndSave; window.exportExcel=exportExcel;
 window.handleAnalyticsFile=handleAnalyticsFile; window.resetAnalytics=resetAnalytics;
+window.renderFlaggedTicketsFiltered=renderFlaggedTicketsFiltered;
 window.addVolumeWeek=addVolumeWeek; window.removeVolumeWeek=removeVolumeWeek;
+window.addVolumeMonth=addVolumeMonth; window.toggleVolumeMonth=toggleVolumeMonth;
+window.renameVolumeWeek=renameVolumeWeek;
 window.toggleVolumeWeek=toggleVolumeWeek;
 window.loadVolumeFromFirestore=loadVolumeFromFirestore;
 window.exportAnalyticsExcel=exportAnalyticsExcel; window.deleteCurrentAnalyticsWeek=deleteCurrentAnalyticsWeek;
@@ -3338,7 +3549,8 @@ wire('btn-sb-logout',doLogout);
 wire('btn-export',       exportExcel);
 
 // Analytics
-wire('btn-vol-addweek',     addVolumeWeek);
+wire('btn-vol-addweek',     ()=>addVolumeWeek());
+wire('btn-vol-addmonth',    addVolumeMonth);
 wire('btn-analytics-pick',  ()=>el('analytics-file-input').click());
 wire('btn-analytics-clear', resetAnalytics);
 wire('btn-analytics-export',exportAnalyticsExcel);
