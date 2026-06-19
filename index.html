@@ -569,6 +569,12 @@ details.card>summary::-webkit-details-marker{display:none;}
       </div>
       <div id="volume-weeks-wrap"></div>
 
+      <!-- Monthly Totals comparison table -->
+      <div class="card" id="volume-monthly-totals-card" style="display:none;margin-top:1.25rem">
+        <div class="card-title">📊 Monthly Totals <span style="font-weight:400;color:var(--grey-400);font-size:.78rem;margin-left:.4rem">tickets handled per agent, compared across months</span></div>
+        <div class="tbl-wrap"><table id="atbl-monthly-totals" class="atbl"></table></div>
+      </div>
+
       <!-- ═══ SECTION 2: RATING UPLOADS ═══ -->
       <div class="analytics-section-hdr" style="margin-top:2rem">
         <div><div class="analytics-section-title">⭐ Ticket Ratings</div><div class="analytics-section-sub">Upload your weekly review sheet (good / bad / advice per agent)</div></div>
@@ -1810,10 +1816,12 @@ function renderVolumeTable(){
 
   if(!agents.length){
     wrap.innerHTML='<div class="empty"><div class="empty-icon">👥</div>Add employees first to track volume.</div>';
+    el('volume-monthly-totals-card').style.display='none';
     return;
   }
   if(!volumeMonths.length){
     wrap.innerHTML='<div class="empty"><div class="empty-icon">📋</div>No months added yet — click "+ Add Week" to start.</div>';
+    el('volume-monthly-totals-card').style.display='none';
     return;
   }
 
@@ -1959,6 +1967,55 @@ function renderVolumeTable(){
       input.addEventListener('keydown',ev=>{if(ev.key==='Enter'){ev.preventDefault();input.blur();}});
     });
   });
+
+  renderMonthlyTotalsTable();
+}
+
+function renderMonthlyTotalsTable(){
+  const card=el('volume-monthly-totals-card');
+  const tbl=el('atbl-monthly-totals');
+  if(!card||!tbl) return;
+  const agents=getVolumeAgents();
+
+  if(!agents.length||volumeMonths.length<1){card.style.display='none';return;}
+
+  const sortedMonths=[...volumeMonths].sort(); // oldest first for a natural left-to-right reading
+  if(!sortedMonths.length){card.style.display='none';return;}
+
+  card.style.display='block';
+
+  // Compute totals per agent per month
+  const monthTotals={}; // {monthKey: {agentName: total}}
+  sortedMonths.forEach(mk=>{
+    monthTotals[mk]={};agents.forEach(a=>monthTotals[mk][a]=0);
+    (volumeWeeksByMonth[mk]||[]).forEach(weekId=>{
+      const wd=volumeData[weekId]||{};
+      VOL_DAYS.forEach((d,di)=>{
+        agents.forEach(a=>{monthTotals[mk][a]+=(wd[di]?.[a]||0);});
+      });
+    });
+  });
+
+  let html='<thead><tr><th class="row-hdr">Month</th>'+agents.map(a=>`<th>${a}</th>`).join('')+'<th>Total</th></tr></thead><tbody>';
+  const grandTotals={};agents.forEach(a=>grandTotals[a]=0);
+  let grandAll=0;
+
+  sortedMonths.forEach(mk=>{
+    let rowTotal=0;
+    html+=`<tr><td class="row-label">${monthLabel(mk)}</td>`;
+    agents.forEach(a=>{
+      const v=monthTotals[mk][a]||0;
+      rowTotal+=v;grandTotals[a]+=v;
+      html+=`<td>${v||'—'}</td>`;
+    });
+    grandAll+=rowTotal;
+    html+=`<td style="font-weight:800;background:var(--grey-50)">${rowTotal}</td></tr>`;
+  });
+
+  html+=`<tr class="total-row"><td class="row-label">Grand Total</td>`;
+  agents.forEach(a=>{html+=`<td>${grandTotals[a]}</td>`;});
+  html+=`<td>${grandAll}</td></tr></tbody>`;
+  tbl.innerHTML=html;
 }
 
 function parseAgentBlockSheet(sheet){
@@ -3505,6 +3562,7 @@ window.renderFlaggedTicketsFiltered=renderFlaggedTicketsFiltered;
 window.addVolumeWeek=addVolumeWeek; window.removeVolumeWeek=removeVolumeWeek;
 window.addVolumeMonth=addVolumeMonth; window.toggleVolumeMonth=toggleVolumeMonth;
 window.renameVolumeWeek=renameVolumeWeek;
+window.renderMonthlyTotalsTable=renderMonthlyTotalsTable;
 window.toggleVolumeWeek=toggleVolumeWeek;
 window.loadVolumeFromFirestore=loadVolumeFromFirestore;
 window.exportAnalyticsExcel=exportAnalyticsExcel; window.deleteCurrentAnalyticsWeek=deleteCurrentAnalyticsWeek;
