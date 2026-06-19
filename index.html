@@ -303,16 +303,19 @@ select option{background:var(--white);}
 
 /* ─── TABLES ─── */
 .tbl-wrap{overflow-x:auto;border-radius:var(--r);box-shadow:var(--shadow);}
-/* Analytics tables */
-.atbl{width:100%;border-collapse:collapse;font-size:.82rem;}
-.atbl th{background:var(--grey-50);padding:.55rem .8rem;text-align:center;font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--grey-400);border-bottom:1.5px solid var(--grey-100);white-space:nowrap;}
-.atbl th.row-hdr{text-align:left;background:var(--grey-900);color:#fff;}
-.atbl td{padding:.5rem .8rem;text-align:center;border-bottom:1px solid var(--grey-100);font-weight:600;}
-.atbl td.row-label{text-align:left;font-weight:700;background:var(--grey-50);color:var(--grey-900);}
+/* Analytics tables — fixed layout so they never overflow the card */
+.atbl{width:100%;table-layout:fixed;border-collapse:collapse;font-size:.78rem;}
+.atbl th{background:var(--grey-50);padding:.45rem .4rem;text-align:center;font-size:.64rem;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--grey-400);border-bottom:1.5px solid var(--grey-100);white-space:normal;word-break:break-word;overflow:hidden;}
+.atbl th.row-hdr{text-align:left;background:var(--grey-900);color:#fff;width:90px;}
+.atbl td{padding:.4rem .35rem;text-align:center;border-bottom:1px solid var(--grey-100);font-weight:600;overflow:hidden;text-overflow:ellipsis;}
+.atbl td.row-label{text-align:left;font-weight:700;background:var(--grey-50);color:var(--grey-900);width:90px;font-size:.72rem;}
 .atbl tr.total-row td{background:var(--amber-light);color:var(--amber);font-weight:800;border-top:2px solid var(--amber);}
 .atbl tr.total-row td.row-label{background:var(--amber-light);}
 .atbl-good td:not(.row-label){color:var(--success);}
 .atbl-bad td:not(.row-label){color:var(--red);}
+.atbl td.editable-cell{cursor:pointer;transition:background .12s;}
+.atbl td.editable-cell:hover{background:var(--primary-light);}
+.atbl td.editable-cell input{width:100%;border:none;background:transparent;text-align:center;font-weight:700;font-size:.78rem;font-family:inherit;color:inherit;padding:0;}
 table{width:100%;border-collapse:collapse;font-size:.85rem;background:var(--white);}
 thead th{background:var(--grey-50);padding:.6rem .9rem;text-align:left;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--grey-400);border-bottom:1.5px solid var(--grey-100);}
 tbody tr{border-bottom:1px solid var(--grey-100);transition:background .12s;}
@@ -520,7 +523,21 @@ details.card>summary::-webkit-details-marker{display:none;}
     <!-- ANALYTICS -->
     <div class="page" id="page-analytics">
       <div class="page-hdr">
-        <div><div class="page-title">Analytics</div><div class="page-sub">Upload your weekly ticket review sheet to generate the report</div></div>
+        <div><div class="page-title">Analytics</div><div class="page-sub">Track ticket volume manually + upload rating sheets per week</div></div>
+      </div>
+
+      <!-- ═══ SECTION 1: MANUAL TICKET VOLUME ═══ -->
+      <div class="card">
+        <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+          <span>📋 Tickets Handled Per Week <span style="font-weight:400;color:var(--grey-400);font-size:.78rem">(click a cell to edit)</span></span>
+          <button class="btn btn-white btn-xs" id="btn-vol-addweek">+ Add Week</button>
+        </div>
+        <div class="tbl-wrap"><table id="vtbl-volume" class="atbl"></table></div>
+      </div>
+
+      <!-- ═══ SECTION 2: RATING UPLOADS ═══ -->
+      <div class="page-hdr" style="margin-top:1.5rem">
+        <div><div class="page-title" style="font-size:1.1rem">Ticket Ratings</div><div class="page-sub">Upload your weekly review sheet (good / bad / advice per agent)</div></div>
         <div class="btn-row">
           <button class="btn btn-white btn-sm" id="btn-analytics-clear" style="display:none">↻ Upload another week</button>
           <button class="btn btn-white btn-sm" id="btn-analytics-export" style="display:none">↓ Export Excel</button>
@@ -528,11 +545,11 @@ details.card>summary::-webkit-details-marker{display:none;}
       </div>
 
       <!-- Upload zone -->
-      <div id="analytics-upload-zone" class="card" style="text-align:center;padding:3rem 2rem;border:2px dashed var(--grey-200);cursor:pointer">
-        <div style="font-size:2.5rem;margin-bottom:.75rem">📊</div>
-        <div style="font-weight:700;font-size:1rem;color:var(--grey-900);margin-bottom:.35rem">Upload Weekly Ticket Sheet</div>
-        <div style="font-size:.85rem;color:var(--grey-400);margin-bottom:1.25rem">Excel file with one block per agent — <strong>Ticket Reference, Comment, Rating</strong> columns (good/bad/advice)</div>
-        <div class="frow" style="max-width:260px;margin:0 auto 1rem">
+      <div id="analytics-upload-zone" class="card" style="text-align:center;padding:2.25rem 2rem;border:2px dashed var(--grey-200);cursor:pointer">
+        <div style="font-size:2rem;margin-bottom:.6rem">📊</div>
+        <div style="font-weight:700;font-size:.95rem;color:var(--grey-900);margin-bottom:.3rem">Upload Weekly Ticket Sheet</div>
+        <div style="font-size:.8rem;color:var(--grey-400);margin-bottom:1rem">One block per agent — <strong>Ticket Reference, Comment, Rating</strong> columns (good/bad/advice)</div>
+        <div class="frow" style="max-width:260px;margin:0 auto .85rem">
           <label style="text-align:left">Week Label</label>
           <input type="text" id="analytics-week-label" placeholder="e.g. Week 1 (1–7 Jun)">
         </div>
@@ -548,40 +565,38 @@ details.card>summary::-webkit-details-marker{display:none;}
       <div id="analytics-report" style="display:none">
 
         <!-- Week selector — switch between uploaded weeks -->
-        <div class="week-bar" style="margin-bottom:1.25rem" id="analytics-week-bar"></div>
+        <div class="week-bar" style="margin-bottom:1.1rem;flex-wrap:wrap" id="analytics-week-bar"></div>
 
         <!-- Per-agent totals for selected week -->
         <div class="card">
           <div class="card-title">📋 Tickets Reviewed Per Agent <span style="font-weight:400;color:var(--grey-400);font-size:.78rem;margin-left:.4rem" id="analytics-summary"></span></div>
-          <div class="tbl-wrap"><table id="atbl-volume"></table></div>
+          <div class="tbl-wrap"><table id="atbl-volume" class="atbl"></table></div>
         </div>
 
-        <!-- Good / Bad / Advice side by side -->
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem">
-          <div class="card">
-            <div class="card-title" style="color:var(--success)">😊 Good</div>
-            <div class="tbl-wrap"><table id="atbl-good"></table></div>
-          </div>
-          <div class="card">
-            <div class="card-title" style="color:var(--red)">😞 Bad</div>
-            <div class="tbl-wrap"><table id="atbl-bad"></table></div>
-          </div>
-          <div class="card">
-            <div class="card-title" style="color:var(--amber)">💡 Advice</div>
-            <div class="tbl-wrap"><table id="atbl-advice"></table></div>
-          </div>
+        <!-- Good / Bad / Advice — stacked, full width, no overflow -->
+        <div class="card">
+          <div class="card-title" style="color:var(--success)">😊 Good Ratings</div>
+          <div class="tbl-wrap"><table id="atbl-good" class="atbl atbl-good"></table></div>
+        </div>
+        <div class="card">
+          <div class="card-title" style="color:var(--red)">😞 Bad Ratings</div>
+          <div class="tbl-wrap"><table id="atbl-bad" class="atbl atbl-bad"></table></div>
+        </div>
+        <div class="card">
+          <div class="card-title" style="color:var(--amber)">💡 Advice</div>
+          <div class="tbl-wrap"><table id="atbl-advice" class="atbl atbl-advice"></table></div>
         </div>
 
-        <!-- Detailed ticket list per agent (expandable) -->
+        <!-- Detailed ticket list per agent -->
         <div class="card">
           <div class="card-title">🎫 Flagged Tickets <span style="font-weight:400;color:var(--grey-400);font-size:.78rem;margin-left:.4rem">bad &amp; advice comments only</span></div>
           <div id="analytics-flagged-list"></div>
         </div>
 
-        <!-- Month comparison across all uploaded weeks -->
+        <!-- Trend across all uploaded weeks -->
         <div class="card" id="analytics-trend-card" style="display:none">
           <div class="card-title">📈 Trend Across Weeks</div>
-          <div class="tbl-wrap"><table id="atbl-trend"></table></div>
+          <div class="tbl-wrap"><table id="atbl-trend" class="atbl"></table></div>
         </div>
 
       </div>
@@ -965,6 +980,7 @@ async function boot(){
   renderSchedule();
   renderBuild();
   loadAnalyticsFromFirestore();
+  loadVolumeFromFirestore();
   // ── Real-time listeners ──
   startRealtimeListeners();
 }
@@ -1609,6 +1625,111 @@ async function assignTasksAndSave(){
 let analyticsWeeks={};      // {weekLabel: {agentData: {agentName: [{ticketRef,comment,rating}]}, uploadedAt}}
 let analyticsCurrentWeek='';
 
+// ── Manual ticket-volume table (editable grid, separate from rating uploads) ──
+// Structure: {weekLabels: ['Week 1','Week 2',...], data: {weekLabel: {agentName: count}}}
+let volumeWeeks=[];     // ordered list of week labels
+let volumeData={};      // {weekLabel: {agentName: count}}
+
+function getVolumeAgents(){
+  return emps.map(e=>e.name);
+}
+
+async function loadVolumeFromFirestore(){
+  try{
+    const doc=await _db.collection('analytics').doc('volumeData').get();
+    if(doc.exists){
+      const d=doc.data();
+      volumeWeeks=d.weeks?JSON.parse(d.weeks):[];
+      volumeData=d.data?JSON.parse(d.data):{};
+    }
+  }catch(e){console.error('Could not load volume data:',e.message);}
+  renderVolumeTable();
+}
+
+async function saveVolumeToFirestore(){
+  try{
+    await _db.collection('analytics').doc('volumeData').set({
+      weeks:JSON.stringify(volumeWeeks),
+      data:JSON.stringify(volumeData)
+    });
+  }catch(e){console.error('Could not save volume data:',e.message);}
+}
+
+function addVolumeWeek(){
+  const nextNum=volumeWeeks.length+1;
+  const label='Week '+nextNum;
+  if(volumeWeeks.includes(label)){toast('Week already exists','err');return;}
+  volumeWeeks.push(label);
+  volumeData[label]={};
+  saveVolumeToFirestore();
+  renderVolumeTable();
+}
+
+async function removeVolumeWeek(label){
+  if(!confirm('Remove "'+label+'" from the volume table?'))return;
+  volumeWeeks=volumeWeeks.filter(w=>w!==label);
+  delete volumeData[label];
+  await saveVolumeToFirestore();
+  renderVolumeTable();
+}
+
+function renderVolumeTable(){
+  const tbl=el('vtbl-volume');
+  if(!tbl) return;
+  const agents=getVolumeAgents();
+  if(!agents.length){
+    tbl.innerHTML='<tr><td style="padding:1rem;text-align:center;color:var(--grey-400)">Add employees first to track volume.</td></tr>';
+    return;
+  }
+  if(!volumeWeeks.length){
+    tbl.innerHTML=`<tr><td style="padding:1rem;text-align:center;color:var(--grey-400)">No weeks added yet — click "+ Add Week" to start.</td></tr>`;
+    return;
+  }
+
+  let html='<thead><tr><th class="row-hdr"></th>'+agents.map(a=>`<th>${a}</th>`).join('')+'<th style="width:36px"></th></tr></thead><tbody>';
+  const totals={};agents.forEach(a=>totals[a]=0);
+
+  volumeWeeks.forEach(w=>{
+    html+=`<tr><td class="row-label">${w}</td>`;
+    agents.forEach(a=>{
+      const v=volumeData[w]?.[a];
+      totals[a]+=(v||0);
+      html+=`<td class="editable-cell" data-vweek="${w}" data-vagent="${a}">${v!=null?v:''}</td>`;
+    });
+    html+=`<td style="text-align:center"><button class="btn-icon-del" data-delweek="${w}" title="Remove week" style="background:none;border:none;color:var(--grey-400);cursor:pointer;font-size:.8rem">✕</button></td></tr>`;
+  });
+
+  html+=`<tr class="total-row"><td class="row-label">Total Per Month</td>`;
+  agents.forEach(a=>{html+=`<td>${totals[a]}</td>`;});
+  html+=`<td></td></tr></tbody>`;
+  tbl.innerHTML=html;
+
+  // Wire editable cells
+  tbl.querySelectorAll('.editable-cell').forEach(cell=>{
+    cell.addEventListener('click',function(){
+      if(cell.querySelector('input')) return; // already editing
+      const week=cell.dataset.vweek,agent=cell.dataset.vagent;
+      const curVal=volumeData[week]?.[agent]||'';
+      cell.innerHTML=`<input type="number" min="0" value="${curVal}">`;
+      const input=cell.querySelector('input');
+      input.focus();input.select();
+      const commit=()=>{
+        const val=parseInt(input.value,10);
+        if(!volumeData[week]) volumeData[week]={};
+        volumeData[week][agent]=isNaN(val)?0:val;
+        saveVolumeToFirestore();
+        renderVolumeTable();
+      };
+      input.addEventListener('blur',commit);
+      input.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();input.blur();}});
+    });
+  });
+  // Wire delete week buttons
+  tbl.querySelectorAll('[data-delweek]').forEach(btn=>{
+    btn.addEventListener('click',e=>{e.stopPropagation();removeVolumeWeek(btn.dataset.delweek);});
+  });
+}
+
 function parseAgentBlockSheet(sheet){
   // Read as a raw 2D array (no header assumption) so we can scan for agent blocks anywhere
   const aoa=XLSX.utils.sheet_to_json(sheet,{header:1,defval:null,raw:false});
@@ -1804,10 +1925,23 @@ function renderAnalyticsReport(){
   if(!weekData) return;
   const agentData=weekData.agentData;
 
-  // Use ShiftFlow employee list for column order, but include any extra names found in the file
+  // Show every agent found in the file — don't drop anyone due to spelling differences.
+  // Order: known ShiftFlow employees first (fuzzy match), then any extra names.
   const fileAgents=Object.keys(agentData);
-  const knownAgents=emps.map(e=>e.name);
-  const agents=[...knownAgents.filter(a=>fileAgents.includes(a)), ...fileAgents.filter(a=>!knownAgents.includes(a))];
+  const knownNames=emps.map(e=>e.name);
+  const norm=s=>(s||'').toLowerCase().replace(/[^a-z]/g,'');
+
+  const matched=[];const unmatched=[];
+  fileAgents.forEach(fa=>{
+    const isKnown=knownNames.some(kn=>norm(kn)===norm(fa)||norm(kn).includes(norm(fa))||norm(fa).includes(norm(kn)));
+    if(isKnown) matched.push(fa); else unmatched.push(fa);
+  });
+  const agents=[...matched,...unmatched];
+
+  if(!agents.length){
+    el('analytics-summary').textContent='No agent data found in this week.';
+    return;
+  }
 
   // ── Totals: tickets reviewed, good, bad, advice per agent ──
   const totals={},good={},bad={},advice={};
@@ -3092,6 +3226,8 @@ window.go=go; window.setView=setView; window.openNewWeekModal=openNewWeekModal;
 window.createWeek=createWeek; window.publishWeek=publishWeek;
 window.assignTasksAndSave=assignTasksAndSave; window.exportExcel=exportExcel;
 window.handleAnalyticsFile=handleAnalyticsFile; window.resetAnalytics=resetAnalytics;
+window.addVolumeWeek=addVolumeWeek; window.removeVolumeWeek=removeVolumeWeek;
+window.loadVolumeFromFirestore=loadVolumeFromFirestore;
 window.exportAnalyticsExcel=exportAnalyticsExcel; window.deleteCurrentAnalyticsWeek=deleteCurrentAnalyticsWeek;
 window.openCellModal=openCellModal; window.saveCell=saveCell; window.clearCell=clearCell;
 window.pickType=pickType; window.loadRequests=loadRequests; window.filterReqs=filterReqs;
@@ -3134,6 +3270,7 @@ wire('btn-sb-logout',doLogout);
 wire('btn-export',       exportExcel);
 
 // Analytics
+wire('btn-vol-addweek',     addVolumeWeek);
 wire('btn-analytics-pick',  ()=>el('analytics-file-input').click());
 wire('btn-analytics-clear', resetAnalytics);
 wire('btn-analytics-export',exportAnalyticsExcel);
