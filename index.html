@@ -138,6 +138,15 @@ select option{background:var(--white);}
 .user-email{font-size:.78rem;font-weight:600;color:var(--grey-900);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .user-role{font-size:.7rem;color:var(--grey-400);}
 
+/* ─── MOBILE TOPBAR (admin only, hidden on desktop) ─── */
+.mobile-topbar{display:none;align-items:center;justify-content:space-between;background:var(--white);border-bottom:1.5px solid var(--grey-100);padding:.75rem 1rem;position:sticky;top:0;z-index:40;}
+.mobile-topbar .sb-logo{margin-bottom:0;padding:0;}
+.mobile-topbar .sb-mark{width:30px;height:30px;font-size:15px;}
+.mobile-topbar .sb-name{font-size:1rem;}
+.hamburger-btn{background:none;border:none;width:40px;height:40px;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:10px;color:var(--grey-900);font-size:1.4rem;flex-shrink:0;}
+.hamburger-btn:hover{background:var(--grey-50);}
+.sidebar-scrim{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:49;}
+
 /* ─── MAIN ─── */
 .main{margin-left:240px;padding:2rem;min-height:100vh;}
 .page{display:none;}.page.active{display:block;}
@@ -145,6 +154,55 @@ select option{background:var(--white);}
 .page-title{font-size:1.5rem;font-weight:800;color:var(--grey-900);letter-spacing:-.3px;}
 .page-sub{font-size:.82rem;color:var(--grey-400);margin-top:2px;}
 .btn-row{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;}
+
+/* ═══════════════════════════════════════════════
+   MOBILE ADMIN LAYOUT (≤860px)
+   Sidebar becomes a slide-in drawer triggered by
+   a hamburger button in a sticky top bar.
+   Employee portal is UNAFFECTED by this breakpoint.
+   ═══════════════════════════════════════════════ */
+@media (max-width:860px){
+  #app .mobile-topbar{display:flex;}
+  #app .sidebar{
+    transform:translateX(-100%);
+    transition:transform .22s ease;
+    width:78vw;max-width:300px;
+    box-shadow:0 0 30px rgba(0,0,0,.18);
+  }
+  #app .sidebar.open{transform:translateX(0);}
+  #app .sidebar.open ~ .sidebar-scrim{display:block;}
+  #app .main{margin-left:0;padding:1.1rem .9rem 2rem;}
+
+  /* Page headers stack and shrink so buttons aren't crushed */
+  .page-hdr{flex-direction:column;align-items:stretch;gap:.6rem;}
+  .page-title{font-size:1.25rem;}
+  .btn-row{width:100%;}
+  .btn-row .btn{flex:1 1 auto;justify-content:center;}
+
+  /* Cards get tighter padding to reclaim width */
+  .card{padding:.9rem;}
+
+  /* Stat-card grids collapse to 2 columns (analytics already has its own
+     rule at 700px; this covers any other multi-column grids) */
+  .g2{grid-template-columns:1fr!important;}
+
+  /* Week bar / filter rows wrap and scroll horizontally instead of
+     overflowing the viewport */
+  .week-bar,.filter-row{flex-wrap:wrap;}
+
+  /* Modals get edge-to-edge on small screens with safe padding */
+  .modal{padding:1.25rem;max-width:94vw;}
+
+  /* Tables: ensure the horizontal scroll affordance is obvious */
+  .sched-outer,.tbl-wrap{-webkit-overflow-scrolling:touch;}
+
+  /* Coverage grid (if multi-column) collapses */
+  .cov-grid{grid-template-columns:1fr!important;}
+}
+@media (min-width:861px){
+  #app .mobile-topbar{display:none;}
+  #app .sidebar-scrim{display:none!important;}
+}
 
 /* ─── CARDS ─── */
 .card{background:var(--white);border-radius:var(--r);box-shadow:var(--shadow);padding:1.25rem;margin-bottom:1rem;}
@@ -429,6 +487,14 @@ details.card>summary::-webkit-details-marker{display:none;}
 <!-- ══ APP ══ -->
 <div id="app">
  <div class="shell">
+  <div class="mobile-topbar">
+    <button class="hamburger-btn" id="btn-mobile-menu" aria-label="Open menu">☰</button>
+    <div class="sb-logo">
+      <div class="sb-mark">S</div>
+      <div class="sb-name">ShiftFlow</div>
+    </div>
+    <div style="width:40px"></div>
+  </div>
   <nav class="sidebar">
     <div class="sb-logo">
       <div class="sb-mark">S</div>
@@ -454,6 +520,7 @@ details.card>summary::-webkit-details-marker{display:none;}
       <button class="btn btn-ghost btn-sm wf" id="btn-sb-logout" style="margin-top:.5rem">Sign out</button>
     </div>
   </nav>
+  <div class="sidebar-scrim" id="sidebar-scrim"></div>
 
   <main class="main">
 
@@ -475,7 +542,7 @@ details.card>summary::-webkit-details-marker{display:none;}
         <div class="sched-outer"><table class="sched-tbl" id="sched-tbl"></table></div>
         <div class="flex gap-3 fw mt3" style="font-size:.75rem;color:var(--grey-400);font-weight:600;">
           <span style="color:#1a7a6a">● AM</span>
-          <span style="color:var(--success)">● PM</span> <span style="color:#a05a00">● Mid</span> <span style="color:#5c3aaa">● OT</span>
+          <span style="color:var(--success)">● PM</span> <span style="color:#a05a00">● Mid</span> <span style="color:#5c3aaa">● Overnight</span>
           <span style="color:var(--red)">● OFF / Leave</span>
         </div>
       </div>
@@ -485,9 +552,10 @@ details.card>summary::-webkit-details-marker{display:none;}
     <!-- BUILD NEXT WEEK -->
     <div class="page" id="page-build">
       <div class="page-hdr">
-        <div><div class="page-title">Build next week</div><div class="page-sub">Approved requests auto-fill · click cells to edit</div></div>
+        <div><div class="page-title">Build next week</div><div class="page-sub">New weeks start blank · click "Apply requests" to pull in approvals</div></div>
         <div class="btn-row">
           <button class="btn btn-white btn-sm" id="btn-new-week">+ New week</button>
+          <button class="btn btn-white btn-sm" id="btn-apply-requests" title="Pull approved day-off/shift requests into this week's schedule">✦ Apply requests</button>
           <button class="btn btn-white btn-sm" id="btn-assign">⚡ Assign tasks</button>
           <button class="btn btn-green btn-sm" id="btn-publish">🚀 Publish</button>
           <button class="btn btn-white btn-sm" id="btn-clear-tasks" style="color:var(--amber);border-color:var(--amber)" title="Clear all task assignments but keep shifts">🗑 Clear tasks</button>
@@ -511,7 +579,7 @@ details.card>summary::-webkit-details-marker{display:none;}
       <div id="build-content" style="display:none">
         <div class="sched-outer"><table class="sched-tbl" id="build-tbl"></table></div>
         <div class="flex gap-3 fw mt3" style="font-size:.75rem;color:var(--grey-400);font-weight:600;">
-          <span style="color:#1a7a6a">● AM</span><span style="color:var(--success)">● PM</span> <span style="color:#a05a00">● Mid</span> <span style="color:#5c3aaa">● OT</span>
+          <span style="color:#1a7a6a">● AM</span><span style="color:var(--success)">● PM</span> <span style="color:#a05a00">● Mid</span> <span style="color:#5c3aaa">● Overnight</span>
           <span style="color:var(--red)">● OFF</span>
           <span style="border:2px dashed var(--primary-mid);padding:0 6px;border-radius:4px;color:var(--primary)">dashed = from approved request</span>
         </div>
@@ -1146,6 +1214,17 @@ function go(name){
   if(name==='requests'){loadRequests();}
   if(name==='coverage') renderCoverage();
   if(name==='employees')renderEmps();
+  closeMobileSidebar(); // collapse the drawer after navigating, mobile only
+}
+
+function openMobileSidebar(){
+  document.querySelector('.sidebar')?.classList.add('open');
+}
+function closeMobileSidebar(){
+  document.querySelector('.sidebar')?.classList.remove('open');
+}
+function toggleMobileSidebar(){
+  document.querySelector('.sidebar')?.classList.toggle('open');
 }
 
 // ══════════════════════════════════════
@@ -1339,19 +1418,15 @@ function openNewWeekModal(){
 async function createWeek(){
   const label=v('nw-lbl');if(!label){toast('Enter a label','err');return;}
   const startDate=v('nw-s'),endDate=v('nw-e');
-  buildApprovedMap();
-  // Build rows: all employees, apply approved request suggestions
+  // New weeks start completely blank — no shift/day-off data.
+  // Approved requests only apply once they exist FOR this week's id,
+  // which only happens after the week is created and employees submit
+  // requests against it. Use "Apply Approved Requests" on the build
+  // page afterward if you want to pull in existing approvals.
   const rows=emps.map(emp=>{
-    const req=approvedMap[emp.name]||{};
     const days={};
     DAYS.forEach(d=>{
-      if(req.dayOff===d){
-        days[d]={shift:'OFF',start:'',end:'',task:'—',note:'',fromReq:true};
-      } else {
-        const pref=req.shiftPrefs?.[d];
-        const dt=pref&&DEF[pref]?DEF[pref]:{s:'',e:''};
-        days[d]={shift:pref&&pref!=='Any'?pref:'',start:dt.s,end:dt.e,task:'—',note:'',fromReq:!!(pref&&pref!=='Any')};
-      }
+      days[d]={shift:'',start:'',end:'',task:'—',note:'',fromReq:false};
     });
     return {name:emp.name,empId:emp.id,days};
   });
@@ -1362,6 +1437,36 @@ async function createWeek(){
     buildWid=ref.id;
     closeM('nw-modal');renderWeekBars();renderBuild();
     toast(`"${label}" created!`,'ok');
+  }catch(e){toast('Error: '+e.message,'err');}
+}
+
+async function applyApprovedRequestsToWeek(){
+  const week=getWeek(buildWid);if(!week)return;
+  buildApprovedMap();
+  const weekApproved=approvedMap[buildWid]||{};
+  if(!Object.keys(weekApproved).length){toast('No approved requests for this week','err');return;}
+  if(!confirm('Apply all approved requests for "'+week.label+'" into the schedule? This will overwrite matching cells.'))return;
+
+  week.rows.forEach(row=>{
+    const req=weekApproved[row.name];
+    if(!req) return;
+    DAYS.forEach(d=>{
+      if(req.dayOff===d){
+        row.days[d]={shift:'OFF',start:'',end:'',task:'—',note:'',fromReq:true};
+      } else {
+        const pref=req.shiftPrefs?.[d];
+        if(pref&&pref!=='Any'){
+          const dt=DEF[pref]||{s:'',e:''};
+          row.days[d]={shift:pref,start:dt.s,end:dt.e,task:row.days[d]?.task||'—',note:row.days[d]?.note||'',fromReq:true};
+        }
+      }
+    });
+  });
+
+  try{
+    await _db.collection('weeks').doc(buildWid).update({rows:JSON.stringify(week.rows)});
+    renderBuild();
+    toast('Approved requests applied!','ok');
   }catch(e){toast('Error: '+e.message,'err');}
 }
 
@@ -1383,8 +1488,10 @@ async function publishWeek(){
 function buildApprovedMap(){
   approvedMap={};
   allReqs.forEach(r=>{
-    if(!approvedMap[r.employeeName]) approvedMap[r.employeeName]={dayOff:null,shiftPrefs:{}};
-    const m=approvedMap[r.employeeName];
+    if(!r.weekId) return; // skip legacy requests with no week reference
+    if(!approvedMap[r.weekId]) approvedMap[r.weekId]={};
+    if(!approvedMap[r.weekId][r.employeeName]) approvedMap[r.weekId][r.employeeName]={dayOff:null,shiftPrefs:{}};
+    const m=approvedMap[r.weekId][r.employeeName];
     if(r.dayOff&&r.dayOffStatus==='approved') m.dayOff=r.dayOff;
     DAYS.forEach(d=>{
       const pref=r.shiftPrefs?.[d];
@@ -1530,8 +1637,8 @@ function openCellModal(empName,day,cell,wid){
   }
   el('cm-s').value=cell.start||'';el('cm-e').value=cell.end||'';el('cm-n').value=cell.note||'';
   toggleTimes(cellShiftType);
-  // Hint from approved request
-  const req=approvedMap[empName];
+  // Hint from approved request — scoped to this specific week
+  const req=approvedMap[wid]?.[empName];
   const hint=el('cm-hint');
   if(req){
     const p=req.dayOff===day?'OFF':(req.shiftPrefs?.[day]||null);
@@ -3153,7 +3260,7 @@ function renderPortalDays(){
   // Legend
   const legend=document.createElement('div');
   legend.style.cssText='display:flex;gap:.75rem;flex-wrap:wrap;margin-top:.75rem;font-size:.72rem;font-weight:600;align-items:center;color:var(--grey-400)';
-  legend.innerHTML='<span style="color:#1a7a6a">● AM</span><span style="color:#3a7a1a">● PM</span><span style="color:#a05a00">● Mid</span><span style="color:#5c3aaa">● OT</span><span style="color:var(--red)">● OFF</span><span style="color:#1a7a6a">● Calls</span><span style="color:#3a7a1a">● Zendesk</span><span style="color:#2563eb">● Emails</span>';
+  legend.innerHTML='<span style="color:#1a7a6a">● AM</span><span style="color:#3a7a1a">● PM</span><span style="color:#a05a00">● Mid</span><span style="color:#5c3aaa">● Overnight</span><span style="color:var(--red)">● OFF</span><span style="color:#1a7a6a">● Calls</span><span style="color:#3a7a1a">● Zendesk</span><span style="color:#2563eb">● Emails</span>';
   wrap.appendChild(legend);
 }
 
@@ -3618,6 +3725,9 @@ async function resolveSwitch(swId, status){
 window.doLogin=doLogin; window.doRegister=doRegister; window.doLogout=doLogout;
 window.go=go; window.setView=setView; window.openNewWeekModal=openNewWeekModal;
 window.createWeek=createWeek; window.publishWeek=publishWeek;
+window.openMobileSidebar=openMobileSidebar; window.closeMobileSidebar=closeMobileSidebar;
+window.toggleMobileSidebar=toggleMobileSidebar;
+window.applyApprovedRequestsToWeek=applyApprovedRequestsToWeek;
 window.assignTasksAndSave=assignTasksAndSave; window.exportExcel=exportExcel;
 window.handleAnalyticsFile=handleAnalyticsFile; window.resetAnalytics=resetAnalytics;
 window.renderFlaggedTicketsFiltered=renderFlaggedTicketsFiltered;
@@ -3664,6 +3774,8 @@ wire('btn-login',    doLogin);
 wire('btn-register', doRegister);
 wire('btn-logout',   doLogout);
 wire('btn-sb-logout',doLogout);
+wire('btn-mobile-menu', toggleMobileSidebar);
+wire('sidebar-scrim',   closeMobileSidebar);
 
 // Schedule
 wire('btn-export',       exportExcel);
@@ -3693,6 +3805,7 @@ if(analyticsZone){
 wire('vt-times',         ()=>setView('times'));
 wire('vt-tasks',         ()=>setView('tasks'));
 wire('btn-new-week',     openNewWeekModal);
+wire('btn-apply-requests', applyApprovedRequestsToWeek);
 wire('btn-assign',       assignTasksAndSave);
 wire('btn-delete-week',  deleteWeek);
 wire('btn-clear-tasks',  clearWeekTasks);
