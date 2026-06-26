@@ -185,7 +185,7 @@ select option{background:var(--white);}
 /* shift backgrounds — soft tints */
 .c-am   {background:#f0faf8;}
 .c-pm   {background:#f0fff8;}
-.c-over {background:#eeebff;}
+.c-ot   {background:#eeebff;}
 .c-mid  {background:#fff8ec;}
 .c-off  {background:#fff4f4;}
 .c-paid {background:#f5f0ff;}
@@ -198,7 +198,7 @@ select option{background:var(--white);}
 .c-note {font-size:.6rem;color:var(--amber);margin-top:1px;}
 /* per-type colours */
 .lc-am   {color:#1a7a6a;}.lc-pm   {color:#3a7a1a;}
-.lc-over {color:#5c3aaa;}.lc-mid  {color:#a05a00;}
+.lc-ot   {color:#5c3aaa;}.lc-mid  {color:#a05a00;}
 .lc-off  {color:var(--red);}.lc-paid,.lc-leave{color:#5c3aaa;}
 .lc-calls{color:#1a7a6a;}.lc-zendesk{color:#3a7a1a;}.lc-emails{color:var(--blue);}
 
@@ -475,7 +475,7 @@ details.card>summary::-webkit-details-marker{display:none;}
         <div class="sched-outer"><table class="sched-tbl" id="sched-tbl"></table></div>
         <div class="flex gap-3 fw mt3" style="font-size:.75rem;color:var(--grey-400);font-weight:600;">
           <span style="color:#1a7a6a">● AM</span>
-          <span style="color:var(--success)">● PM</span> <span style="color:#a05a00">● Mid</span>
+          <span style="color:var(--success)">● PM</span> <span style="color:#a05a00">● Mid</span> <span style="color:#5c3aaa">● OT</span>
           <span style="color:var(--red)">● OFF / Leave</span>
         </div>
       </div>
@@ -511,7 +511,7 @@ details.card>summary::-webkit-details-marker{display:none;}
       <div id="build-content" style="display:none">
         <div class="sched-outer"><table class="sched-tbl" id="build-tbl"></table></div>
         <div class="flex gap-3 fw mt3" style="font-size:.75rem;color:var(--grey-400);font-weight:600;">
-          <span style="color:#1a7a6a">● AM</span><span style="color:var(--success)">● PM</span> <span style="color:#a05a00">● Mid</span>
+          <span style="color:#1a7a6a">● AM</span><span style="color:var(--success)">● PM</span> <span style="color:#a05a00">● Mid</span> <span style="color:#5c3aaa">● OT</span>
           <span style="color:var(--red)">● OFF</span>
           <span style="border:2px dashed var(--primary-mid);padding:0 6px;border-radius:4px;color:var(--primary)">dashed = from approved request</span>
         </div>
@@ -701,6 +701,7 @@ details.card>summary::-webkit-details-marker{display:none;}
         <div class="stype-btn" data-v="AM">AM</div>
         <div class="stype-btn" data-v="PM">PM</div>
         <div class="stype-btn" data-v="Mid">Mid</div>
+        <div class="stype-btn" data-v="OT">Overtime</div>
         <div class="stype-btn" data-v="OFF">OFF</div>
         <div class="stype-btn" data-v="Paid">Paid leave</div>
         <div class="stype-btn" data-v="Leave">Unpaid leave</div>
@@ -894,6 +895,7 @@ details.card>summary::-webkit-details-marker{display:none;}
       <div class="stype-btn" data-v="AM">AM</div>
       <div class="stype-btn" data-v="PM">PM</div>
       <div class="stype-btn" data-v="Mid">Mid</div>
+      <div class="stype-btn" data-v="OT">Overtime</div>
     </div>
   </div>
 </div>
@@ -941,11 +943,11 @@ details.card>summary::-webkit-details-marker{display:none;}
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:1rem">
           <div class="frow" style="margin:0"><label>Your current shift</label>
             <select id="sw-myshift"><option value="">— Your shift —</option>
-              <option>AM</option><option>PM</option><option>Mid</option></select>
+              <option>AM</option><option>PM</option><option>Mid</option><option>OT</option></select>
           </div>
           <div class="frow" style="margin:0"><label>Their current shift</label>
             <select id="sw-othershift"><option value="">— Their shift —</option>
-              <option>AM</option><option>PM</option><option>Mid</option></select>
+              <option>AM</option><option>PM</option><option>Mid</option><option>OT</option></select>
           </div>
         </div>
         <div class="frow"><label>Reason (optional)</label><textarea id="sw-reason" rows="2" placeholder="e.g. personal appointment"></textarea></div>
@@ -968,10 +970,10 @@ details.card>summary::-webkit-details-marker{display:none;}
 const DAYS=['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
 const TASKS=['Calls','Zendesk','Emails'];
 const TCLS={Calls:'b-calls',Zendesk:'b-zendesk',Emails:'b-emails'};
-const SHIFT_BG={AM:'c-am',PM:'c-pm',Mid:'c-mid',OFF:'c-off',Paid:'c-paid',Leave:'c-leave'};
-const SHIFT_LC={AM:'lc-am',PM:'lc-pm',Mid:'lc-mid',OFF:'lc-off',Paid:'lc-paid',Leave:'lc-leave'};
+const SHIFT_BG={AM:'c-am',PM:'c-pm',Mid:'c-mid',OT:'c-ot',OFF:'c-off',Paid:'c-paid',Leave:'c-leave'};
+const SHIFT_LC={AM:'lc-am',PM:'lc-pm',Mid:'lc-mid',OT:'lc-ot',OFF:'lc-off',Paid:'lc-paid',Leave:'lc-leave'};
 const TASK_LC={Calls:'lc-calls',Zendesk:'lc-zendesk',Emails:'lc-emails'};
-const DEF={AM:{s:'08:00',e:'15:30'},PM:{s:'15:30',e:'23:00'},Mid:{s:'12:00',e:'19:30'},OFF:{s:'',e:''},Paid:{s:'',e:''},Leave:{s:'',e:''}};
+const DEF={AM:{s:'08:00',e:'15:30'},PM:{s:'15:30',e:'23:00'},Mid:{s:'12:00',e:'19:30'},OT:{s:'23:00',e:'07:00'},OFF:{s:'',e:''},Paid:{s:'',e:''},Leave:{s:'',e:''}};
 
 let fb,db,auth;
 let emps=[];
@@ -1524,7 +1526,7 @@ function openCellModal(empName,day,cell,wid){
   document.querySelectorAll('.stype-btn').forEach(b=>b.className='stype-btn');
   if(cellShiftType){
     const ab=document.querySelector(`.stype-btn[data-v="${cellShiftType}"]`);
-    if(ab) ab.className='stype-btn sel'+(cellShiftType==='OFF'?' sel-off':'');
+    if(ab) ab.className='stype-btn sel'+(cellShiftType==='OFF'?' sel-off':cellShiftType==='OT'?' sel-over':'');
   }
   el('cm-s').value=cell.start||'';el('cm-e').value=cell.end||'';el('cm-n').value=cell.note||'';
   toggleTimes(cellShiftType);
@@ -1542,7 +1544,7 @@ function openCellModal(empName,day,cell,wid){
 function pickType(btn){
   cellShiftType=btn.dataset.v;
   document.querySelectorAll('.stype-btn').forEach(b=>b.className='stype-btn');
-  btn.className='stype-btn sel'+(cellShiftType==='OFF'?' sel-off':'');
+  btn.className='stype-btn sel'+(cellShiftType==='OFF'?' sel-off':cellShiftType==='OT'?' sel-over':'');
   const dt=DEF[cellShiftType]||{s:'',e:''};
   el('cm-s').value=dt.s;el('cm-e').value=dt.e;
   toggleTimes(cellShiftType);
@@ -2472,6 +2474,7 @@ function exportExcel(){
   const ab={top:tb,bottom:tb,left:tb,right:tb};
   const fills={AM:{patternType:'solid',fgColor:{rgb:'FFFFFF'}},PM:{patternType:'solid',fgColor:{rgb:'FFFFFF'}},
 Mid:{patternType:'solid',fgColor:{rgb:'E3F2FF'}},
+    OT:{patternType:'solid',fgColor:{rgb:'D6CCFF'}},
     OFF:{patternType:'solid',fgColor:{rgb:'FFFF00'}},Paid:{patternType:'solid',fgColor:{rgb:'E0CCFF'}},
     Leave:{patternType:'solid',fgColor:{rgb:'E0CCFF'}},'default':{patternType:'solid',fgColor:{rgb:'F5F5F5'}}};
   // hdr1
@@ -2695,7 +2698,7 @@ function renderReqs(){
       if(pref==='Any'&&!isDO) return '';
       const key=isDO?'dayOff':d;
       const st=isDO?(r.dayOffStatus||'pending'):(r.dayStatuses?.[d]||'pending');
-      const pclr=pref==='OFF'?'var(--red)':pref==='AM'?'var(--a2)':pref==='PM'?'var(--ac)':pref==='Mid'?'var(--a4)':'var(--t2)';
+      const pclr=pref==='OFF'?'var(--red)':pref==='AM'?'var(--a2)':pref==='PM'?'var(--ac)':pref==='OT'?'#5c3aaa':pref==='Mid'?'var(--a4)':'var(--t2)';
 
       // Check if THIS specific day is conflicting
       let isDayConflict=false;
@@ -2966,7 +2969,7 @@ function onWeekSelected(){
         if(pref&&pref!=='Any'){
           portalDayPrefs[d]=pref;
           const p=el('preq-pref-'+d);const ch=el('preq-chip-'+d);
-          const clr=pref==='AM'?'#1a7a6a':pref==='PM'?'#3a7a1a':pref==='Mid'?'#a05a00':'var(--grey-600)';
+          const clr=pref==='AM'?'#1a7a6a':pref==='PM'?'#3a7a1a':pref==='OT'?'#5c3aaa':pref==='Mid'?'#a05a00':'var(--grey-600)';
           if(p){p.textContent=pref;p.style.color=clr;}
           if(ch){ch.style.borderColor='var(--primary)';ch.style.background='var(--primary-light)';}
         }
@@ -3150,7 +3153,7 @@ function renderPortalDays(){
   // Legend
   const legend=document.createElement('div');
   legend.style.cssText='display:flex;gap:.75rem;flex-wrap:wrap;margin-top:.75rem;font-size:.72rem;font-weight:600;align-items:center;color:var(--grey-400)';
-  legend.innerHTML='<span style="color:#1a7a6a">● AM</span><span style="color:#3a7a1a">● PM</span><span style="color:#a05a00">● Mid</span><span style="color:var(--red)">● OFF</span><span style="color:#1a7a6a">● Calls</span><span style="color:#3a7a1a">● Zendesk</span><span style="color:#2563eb">● Emails</span>';
+  legend.innerHTML='<span style="color:#1a7a6a">● AM</span><span style="color:#3a7a1a">● PM</span><span style="color:#a05a00">● Mid</span><span style="color:#5c3aaa">● OT</span><span style="color:var(--red)">● OFF</span><span style="color:#1a7a6a">● Calls</span><span style="color:#3a7a1a">● Zendesk</span><span style="color:#2563eb">● Emails</span>';
   wrap.appendChild(legend);
 }
 
@@ -3212,7 +3215,7 @@ function pickDayPref(btn){
   const chipEl=el(`preq-chip-${day}`);
   if(prefEl){
     prefEl.textContent=val;
-    const clr=val==='AM'?'#1a7a6a':val==='PM'?'#3a7a1a':val==='Overnight'?'#888':val==='Mid'?'#a05a00':'var(--grey-600)';
+    const clr=val==='AM'?'#1a7a6a':val==='PM'?'#3a7a1a':val==='OT'?'#5c3aaa':val==='Mid'?'#a05a00':'var(--grey-600)';
     prefEl.style.color=clr;
     chipEl.style.borderColor=val==='Any'?'var(--grey-200)':'var(--primary)';
     chipEl.style.background=val==='Any'?'var(--grey-50)':'var(--primary-light)';
@@ -3338,7 +3341,7 @@ function buildPswDaysGrid(){
     const hasShift=c.shift&&c.shift!=='OFF'&&c.shift!=='Paid'&&c.shift!=='Leave';
     const bg=hasShift?'var(--white)':'var(--grey-50)';
     const bdr=hasShift?'var(--grey-200)':'var(--grey-100)';
-    const clr=c.shift==='AM'?'#1a7a6a':c.shift==='PM'?'#3a7a1a':c.shift==='Mid'?'#a05a00':'var(--grey-400)';
+    const clr=c.shift==='AM'?'#1a7a6a':c.shift==='PM'?'#3a7a1a':c.shift==='OT'?'#5c3aaa':c.shift==='Mid'?'#a05a00':'var(--grey-400)';
     return `<div data-swday="${d}" data-swshift="${c.shift||''}" data-swstart="${c.start||''}" data-swend="${c.end||''}"
       style="cursor:${hasShift?'pointer':'default'};background:${bg};border:1.5px solid ${bdr};border-radius:var(--r2);padding:.5rem .2rem;text-align:center;transition:all .14s;opacity:${hasShift?'1':'.45'}" id="psw-chip-${d}">
       <div style="font-size:.62rem;font-weight:700;color:var(--grey-400);text-transform:uppercase">${d.slice(0,3)}</div>
@@ -3440,7 +3443,7 @@ async function loadEmpsForForm(){
   // Build pref grid
   el('fpref-grid').innerHTML=DAYS.map(d=>`<div>
     <label style="font-size:.62rem">${d}</label>
-    <select id="fp-${d}"><option>Any</option><option>AM</option><option>PM</option><option>Mid</option></select>
+    <select id="fp-${d}"><option>Any</option><option>AM</option><option>PM</option><option>Mid</option><option>OT</option></select>
   </div>`).join('');
 }
 
