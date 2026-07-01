@@ -81,7 +81,7 @@ window.__fb = {
   --shadow:0 1px 4px rgba(0,0,0,.07),0 0 0 1px rgba(0,0,0,.04);
   --shadow-md:0 4px 20px rgba(0,0,0,.1),0 0 0 1px rgba(0,0,0,.04);
 }
-body{background:var(--off);color:var(--grey-900);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;min-height:100vh;font-size:15px;line-height:1.5;}
+body{background:var(--off);color:var(--grey-900);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;min-height:100vh;font-size:15px;line-height:1.5;overflow-x:hidden;}
 ::-webkit-scrollbar{width:4px;height:4px;}
 ::-webkit-scrollbar-track{background:transparent;}
 ::-webkit-scrollbar-thumb{background:var(--grey-200);border-radius:2px;}
@@ -162,6 +162,8 @@ select option{background:var(--white);}
    Employee portal is UNAFFECTED by this breakpoint.
    ═══════════════════════════════════════════════ */
 @media (max-width:860px){
+  #app{overflow-x:hidden;width:100%;}
+  #app .shell{flex-direction:column;width:100%;overflow-x:hidden;}
   #app .mobile-topbar{display:flex;}
   #app .sidebar{
     transform:translateX(-100%);
@@ -171,7 +173,7 @@ select option{background:var(--white);}
   }
   #app .sidebar.open{transform:translateX(0);}
   #app .sidebar.open ~ .sidebar-scrim{display:block;}
-  #app .main{margin-left:0;padding:1.1rem .9rem 2rem;}
+  #app .main{margin-left:0;padding:1.1rem .9rem 2rem;width:100%;max-width:100vw;overflow-x:hidden;}
 
   /* Page headers stack and shrink so buttons aren't crushed */
   .page-hdr{flex-direction:column;align-items:stretch;gap:.6rem;}
@@ -393,6 +395,26 @@ select option{background:var(--white);}
 .astat-value{font-size:1.65rem;font-weight:800;letter-spacing:-.02em;line-height:1;}
 .astat-sub{font-size:.74rem;color:var(--grey-400);margin-top:.3rem;}
 @media (max-width:700px){#analytics-stat-cards{grid-template-columns:repeat(2,1fr)!important;}}
+
+/* ─── LEADERBOARD ─── */
+.lb-podium-slot{display:flex;flex-direction:column;align-items:center;gap:.5rem;flex:1;max-width:120px;}
+.lb-avatar{border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff;font-size:1.1rem;flex-shrink:0;}
+.lb-rank-badge{font-size:.65rem;font-weight:800;padding:.15rem .5rem;border-radius:100px;letter-spacing:.04em;}
+.lb-podium-name{font-size:.78rem;font-weight:700;color:var(--grey-900);text-align:center;line-height:1.2;}
+.lb-podium-count{font-size:1.5rem;font-weight:800;line-height:1;}
+.lb-podium-bar{border-radius:10px 10px 0 0;width:100%;}
+.lb-row{display:flex;align-items:center;gap:.85rem;background:var(--white);border-radius:12px;padding:.85rem 1rem;margin-bottom:.6rem;box-shadow:0 1px 2px rgba(0,0,0,.04),0 1px 6px rgba(0,0,0,.03);transition:transform .12s;}
+.lb-row:hover{transform:translateX(2px);}
+.lb-row.is-me{border-left:3px solid var(--primary);}
+.lb-row-rank{font-size:1rem;font-weight:800;color:var(--grey-300);width:28px;text-align:center;flex-shrink:0;}
+.lb-row-av{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:.9rem;color:#fff;flex-shrink:0;}
+.lb-row-name{font-weight:700;font-size:.9rem;color:var(--grey-900);flex:1;}
+.lb-row-me-tag{font-size:.65rem;font-weight:700;background:rgba(240,35,60,.1);color:var(--primary);padding:.1rem .45rem;border-radius:100px;}
+.lb-row-count{font-size:1.1rem;font-weight:800;color:var(--grey-900);text-align:right;}
+.lb-row-bar-wrap{width:100%;background:var(--grey-100);border-radius:100px;height:4px;margin-top:.35rem;}
+.lb-row-bar{height:4px;border-radius:100px;transition:width .5s ease;}
+.lb-week-chip{padding:.3rem .85rem;border-radius:100px;background:var(--grey-50);border:1.5px solid var(--grey-200);color:var(--grey-600);cursor:pointer;font-size:.78rem;font-weight:600;transition:all .14s;white-space:nowrap;}
+.lb-week-chip.active{background:var(--primary);color:#fff;border-color:var(--primary);}
 
 /* Analytics section headers */
 .analytics-section-hdr{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:1.1rem;padding-bottom:.5rem;border-bottom:1px solid var(--grey-100);}
@@ -874,6 +896,7 @@ details.card>summary::-webkit-details-marker{display:none;}
       <button class="rtab active" id="ptab-sched" data-tab="sched">📅 My Schedule</button>
       <button class="rtab" id="ptab-req" data-tab="req">📋 Request Week</button>
       <button class="rtab" id="ptab-switch" data-tab="switch">🔄 Request Switch</button>
+      <button class="rtab" id="ptab-leaderboard" data-tab="leaderboard">🏆 Leaderboard</button>
     </div>
     <!-- MY SCHEDULE -->
     <div id="ptab-sched-content">
@@ -947,6 +970,28 @@ details.card>summary::-webkit-details-marker{display:none;}
         <div class="frow"><label>Reason (optional)</label><textarea id="psw-reason" rows="2" placeholder="e.g. personal appointment"></textarea></div>
         <div class="ferror" id="psw-err"></div>
         <button class="btn btn-green wf" id="btn-portal-sw">Submit switch request</button>
+      </div>
+    </div>
+
+    <!-- LEADERBOARD TAB -->
+    <div id="ptab-leaderboard-content" style="display:none">
+      <div style="font-size:1.2rem;font-weight:800;color:var(--grey-900);margin-bottom:.2rem">Leaderboard 🏆</div>
+      <div style="font-size:.85rem;color:var(--grey-400);margin-bottom:1.25rem">Tickets solved per agent — from volume data</div>
+
+      <!-- Week selector -->
+      <div id="lb-week-bar" style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1.25rem"></div>
+
+      <!-- Podium top 3 -->
+      <div id="lb-podium" style="display:flex;align-items:flex-end;justify-content:center;gap:.75rem;margin-bottom:1.5rem;padding:0 .5rem"></div>
+
+      <!-- Full rankings list -->
+      <div id="lb-rankings"></div>
+
+      <!-- Empty state -->
+      <div id="lb-empty" style="display:none;text-align:center;padding:3rem 1rem">
+        <div style="font-size:2.5rem;margin-bottom:.75rem;opacity:.25">📊</div>
+        <div style="font-weight:700;color:var(--grey-400)">No ticket data yet</div>
+        <div style="font-size:.82rem;color:var(--grey-400);margin-top:.35rem">Ask your manager to add volume data in the Analytics page.</div>
       </div>
     </div>
   </div>
@@ -2935,7 +2980,8 @@ async function bootPortal(empName,uid){
   }catch(e){}
   await loadPortalSchedule();
   await loadPortalRequest();
-  await loadWeeksForPortal(); // load weeks for the request selector
+  await loadWeeksForPortal();
+  await loadLeaderboardData(); // load volume data for leaderboard
   buildPreqDaysGrid();
   buildPswWeekSelector(); // switch week selector (replaces buildPswDaysGrid)
   buildColleagueList();
@@ -3265,11 +3311,139 @@ function renderPortalDays(){
 }
 
 function switchPortalTab(tab){
-  ['sched','req','switch'].forEach(t=>{
+  ['sched','req','switch','leaderboard'].forEach(t=>{
     el('ptab-'+t).classList.toggle('active',t===tab);
     el('ptab-'+t+'-content').style.display=t===tab?'block':'none';
   });
   if(tab==='req'){el('preq-name').value=portalEmpName;}
+  if(tab==='leaderboard') renderLeaderboard();
+}
+
+// ── LEADERBOARD ──
+let lbCurrentWeekId=null;
+
+async function loadLeaderboardData(){
+  // Volume data is already loaded from Firestore into volumeWeeks/volumeData
+  // by loadVolumeFromFirestore() in bootPortal — we just need to render.
+  // If not loaded yet (employee portal loads independently), fetch it now.
+  if(!volumeMonths.length){
+    try{
+      const doc=await _db.collection('analytics').doc('volumeData').get();
+      if(doc.exists){
+        const d=doc.data();
+        volumeMonths=d.months?JSON.parse(d.months):[];
+        volumeWeeksByMonth=d.weeksByMonth?JSON.parse(d.weeksByMonth):{};
+        volumeWeekMeta=d.weekMeta?JSON.parse(d.weekMeta):{};
+        volumeData=d.data?JSON.parse(d.data):{};
+      }
+    }catch(e){console.error('Leaderboard load error:',e.message);}
+  }
+}
+
+function renderLeaderboard(){
+  const barEl=el('lb-week-bar');
+  const podiumEl=el('lb-podium');
+  const rankingsEl=el('lb-rankings');
+  const emptyEl=el('lb-empty');
+
+  // Collect all weeks across all months, sorted
+  const allWeekIds=[];
+  [...volumeMonths].sort().forEach(mk=>{
+    (volumeWeeksByMonth[mk]||[]).forEach(wid=>allWeekIds.push(wid));
+  });
+
+  if(!allWeekIds.length){
+    barEl.innerHTML='';podiumEl.innerHTML='';rankingsEl.innerHTML='';
+    emptyEl.style.display='block';return;
+  }
+  emptyEl.style.display='none';
+
+  // Default to most recent week
+  if(!lbCurrentWeekId||!allWeekIds.includes(lbCurrentWeekId)){
+    lbCurrentWeekId=allWeekIds[allWeekIds.length-1];
+  }
+
+  // Week bar
+  barEl.innerHTML=allWeekIds.map(wid=>{
+    const label=volumeWeekMeta[wid]?.label||wid;
+    return `<div class="lb-week-chip${wid===lbCurrentWeekId?' active':''}" data-lbweek="${wid}">${label}</div>`;
+  }).join('');
+  barEl.querySelectorAll('[data-lbweek]').forEach(chip=>{
+    chip.addEventListener('click',()=>{lbCurrentWeekId=chip.dataset.lbweek;renderLeaderboard();});
+  });
+
+  // Compute totals for the selected week
+  const weekData=volumeData[lbCurrentWeekId]||{};
+  const agentTotals={};
+  emps.forEach(e=>agentTotals[e.name]=0);
+  VOL_DAYS.forEach((d,di)=>{
+    Object.entries(weekData[di]||{}).forEach(([agent,count])=>{
+      if(agentTotals[agent]!==undefined) agentTotals[agent]+=(count||0);
+      else agentTotals[agent]=(count||0);
+    });
+  });
+
+  // Sort descending
+  const sorted=Object.entries(agentTotals)
+    .map(([name,total])=>({name,total}))
+    .sort((a,b)=>b.total-a.total)
+    .filter(e=>e.total>0||emps.find(em=>em.name===e.name));
+
+  const maxTotal=sorted[0]?.total||1;
+
+  // Avatar color palette
+  const COLORS=['#f0233c','#1a7a6a','#3a7a1a','#5c3aaa','#a05a00','#2563eb'];
+  const colorOf=name=>COLORS[emps.findIndex(e=>e.name===name)%COLORS.length]||'#888';
+  const initials=name=>name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+
+  // ── PODIUM (top 3) ──
+  const podiumOrder=[1,0,2]; // 2nd, 1st, 3rd
+  const podiumHeights=['80px','110px','60px'];
+  const podiumBg=['linear-gradient(135deg,#b0bec5,#90a4ae)','linear-gradient(135deg,#ffd54f,#ffb300)','linear-gradient(135deg,#d4a574,#bf8040)'];
+  const medals=['🥈','🥇','🥉'];
+
+  podiumEl.innerHTML='';
+  podiumEl.style.cssText='display:flex;align-items:flex-end;justify-content:center;gap:.75rem;margin-bottom:1.5rem;padding:.5rem .25rem 0';
+
+  podiumOrder.forEach((rank,slotIdx)=>{
+    const entry=sorted[rank];
+    if(!entry) return;
+    const isMe=entry.name===portalEmpName;
+    const col=colorOf(entry.name);
+    const slot=document.createElement('div');
+    slot.className='lb-podium-slot';
+    slot.style.cssText='display:flex;flex-direction:column;align-items:center;gap:.4rem;flex:1;max-width:110px;';
+    slot.innerHTML=`
+      <div style="font-size:1.4rem">${medals[slotIdx]}</div>
+      <div style="width:48px;height:48px;border-radius:50%;background:${col};display:flex;align-items:center;justify-content:center;font-weight:800;font-size:.95rem;color:#fff;${isMe?'box-shadow:0 0 0 3px var(--primary),0 0 0 5px rgba(240,35,60,.2)':''}">${initials(entry.name)}</div>
+      <div style="font-size:.72rem;font-weight:700;color:var(--grey-900);text-align:center;line-height:1.2">${entry.name.split(' ')[0]}<br><span style="color:var(--grey-400);font-weight:600">${entry.name.split(' ').slice(1).join(' ')}</span></div>
+      <div style="font-size:1.35rem;font-weight:800;color:${col}">${entry.total}</div>
+      <div style="height:${podiumHeights[slotIdx]};width:100%;background:${podiumBg[slotIdx]};border-radius:10px 10px 0 0;display:flex;align-items:center;justify-content:center;font-size:.7rem;font-weight:700;color:rgba(0,0,0,.4)">#${rank+1}</div>`;
+    podiumEl.appendChild(slot);
+  });
+
+  // ── FULL RANKINGS LIST ──
+  rankingsEl.innerHTML=sorted.map((entry,i)=>{
+    const isMe=entry.name===portalEmpName;
+    const col=colorOf(entry.name);
+    const pct=maxTotal?Math.round(entry.total/maxTotal*100):0;
+    const rankIcon=i===0?'🥇':i===1?'🥈':i===2?'🥉':`${i+1}`;
+    return `<div class="lb-row${isMe?' is-me':''}">
+      <div class="lb-row-rank">${rankIcon}</div>
+      <div class="lb-row-av" style="background:${col}">${initials(entry.name)}</div>
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:.45rem">
+          <span class="lb-row-name">${entry.name}</span>
+          ${isMe?'<span class="lb-row-me-tag">You</span>':''}
+        </div>
+        <div class="lb-row-bar-wrap"><div class="lb-row-bar" style="width:${pct}%;background:${col}"></div></div>
+      </div>
+      <div style="text-align:right">
+        <div class="lb-row-count" style="color:${col}">${entry.total}</div>
+        <div style="font-size:.65rem;color:var(--grey-400)">tickets</div>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 // ── MY SCHEDULE ──
@@ -3749,6 +3923,7 @@ window.togglePwVis=togglePwVis;
 window.closeM=closeM; window.openM=openM;
 window.submitForm=submitForm; window.submitSwitchForm=submitSwitchForm;
 window.switchFormType=switchFormType; window.switchPortalTab=switchPortalTab;
+window.renderLeaderboard=renderLeaderboard; window.loadLeaderboardData=loadLeaderboardData;
 window.openDayPrefModal=openDayPrefModal; window.pickDayPref=pickDayPref;
 window.submitPortalRequest=submitPortalRequest; window.selectSwitchDay=selectSwitchDay;
 window.deleteWeek=deleteWeek; window.clearWeekTasks=clearWeekTasks;
@@ -3830,7 +4005,8 @@ wire('btn-portal-sw',    submitPortalSwitch);
 // Portal tabs — wire directly since they exist at page load
 wire('ptab-sched',   ()=>switchPortalTab('sched'));
 wire('ptab-req',     ()=>switchPortalTab('req'));
-wire('ptab-switch',  ()=>switchPortalTab('switch'));
+wire('ptab-switch',       ()=>switchPortalTab('switch'));
+wire('ptab-leaderboard',  ()=>switchPortalTab('leaderboard'));
 
 // Form type tabs in public form
 wire('ftype-week',   ()=>switchFormType('week'));
