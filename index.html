@@ -3316,35 +3316,41 @@ function switchPortalTab(tab){
     el('ptab-'+t+'-content').style.display=t===tab?'block':'none';
   });
   if(tab==='req'){el('preq-name').value=portalEmpName;}
-  if(tab==='leaderboard') renderLeaderboard();
+  if(tab==='leaderboard') renderLeaderboard(); // async, fires and renders when ready
 }
 
 // ── LEADERBOARD ──
 let lbCurrentWeekId=null;
 
 async function loadLeaderboardData(){
-  // Volume data is already loaded from Firestore into volumeWeeks/volumeData
-  // by loadVolumeFromFirestore() in bootPortal — we just need to render.
-  // If not loaded yet (employee portal loads independently), fetch it now.
-  if(!volumeMonths.length){
-    try{
-      const doc=await _db.collection('analytics').doc('volumeData').get();
-      if(doc.exists){
-        const d=doc.data();
-        volumeMonths=d.months?JSON.parse(d.months):[];
-        volumeWeeksByMonth=d.weeksByMonth?JSON.parse(d.weeksByMonth):{};
-        volumeWeekMeta=d.weekMeta?JSON.parse(d.weekMeta):{};
-        volumeData=d.data?JSON.parse(d.data):{};
-      }
-    }catch(e){console.error('Leaderboard load error:',e.message);}
-  }
+  // Always fetch fresh from Firestore — employee portal runs independently
+  // and doesn't share the admin's in-memory volumeMonths/volumeData state.
+  try{
+    const doc=await _db.collection('analytics').doc('volumeData').get();
+    if(doc.exists){
+      const d=doc.data();
+      volumeMonths=d.months?JSON.parse(d.months):[];
+      volumeWeeksByMonth=d.weeksByMonth?JSON.parse(d.weeksByMonth):{};
+      volumeWeekMeta=d.weekMeta?JSON.parse(d.weekMeta):{};
+      volumeData=d.data?JSON.parse(d.data):{};
+      console.log('Leaderboard: loaded',volumeMonths.length,'months');
+    }
+  }catch(e){console.error('Leaderboard load error:',e.message);}
 }
 
-function renderLeaderboard(){
+async function renderLeaderboard(){
   const barEl=el('lb-week-bar');
   const podiumEl=el('lb-podium');
   const rankingsEl=el('lb-rankings');
   const emptyEl=el('lb-empty');
+
+  // Show loading state while fetching
+  podiumEl.innerHTML='';
+  rankingsEl.innerHTML='<div style="padding:2rem;text-align:center"><div class="spinner"></div></div>';
+  emptyEl.style.display='none';
+
+  // Always reload fresh from Firestore so employee sees latest data
+  await loadLeaderboardData();
 
   // Collect all weeks across all months, sorted
   const allWeekIds=[];
