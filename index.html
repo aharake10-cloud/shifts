@@ -3352,11 +3352,23 @@ async function renderLeaderboard(){
   // Always reload fresh from Firestore so employee sees latest data
   await loadLeaderboardData();
 
-  // Collect all weeks across all months, sorted
+  // Collect all weeks across all months, sorted, with their month context
   const allWeekIds=[];
+  const weekMonthMap={}; // {weekId: monthKey}
   [...volumeMonths].sort().forEach(mk=>{
-    (volumeWeeksByMonth[mk]||[]).forEach(wid=>allWeekIds.push(wid));
+    (volumeWeeksByMonth[mk]||[]).forEach(wid=>{
+      allWeekIds.push(wid);
+      weekMonthMap[wid]=mk;
+    });
   });
+
+  function lbWeekLabel(wid){
+    const label=volumeWeekMeta[wid]?.label||wid;
+    const mk=weekMonthMap[wid];
+    if(!mk) return label;
+    const mName=new Date(mk+'-01').toLocaleDateString('en-GB',{month:'short'});
+    return `${label} · ${mName}`;
+  }
 
   if(!allWeekIds.length){
     barEl.innerHTML='';podiumEl.innerHTML='';rankingsEl.innerHTML='';
@@ -3371,8 +3383,7 @@ async function renderLeaderboard(){
 
   // Week bar
   barEl.innerHTML=allWeekIds.map(wid=>{
-    const label=volumeWeekMeta[wid]?.label||wid;
-    return `<div class="lb-week-chip${wid===lbCurrentWeekId?' active':''}" data-lbweek="${wid}">${label}</div>`;
+    return `<div class="lb-week-chip${wid===lbCurrentWeekId?' active':''}" data-lbweek="${wid}">${lbWeekLabel(wid)}</div>`;
   }).join('');
   barEl.querySelectorAll('[data-lbweek]').forEach(chip=>{
     chip.addEventListener('click',()=>{lbCurrentWeekId=chip.dataset.lbweek;renderLeaderboard();});
