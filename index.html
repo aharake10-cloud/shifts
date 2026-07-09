@@ -256,6 +256,7 @@ select option{background:var(--white);}
 .c-times{font-size:.78rem;font-weight:600;color:var(--grey-900);}
 .c-task {font-size:.65rem;font-weight:600;letter-spacing:.02em;}
 .c-note {font-size:.6rem;color:var(--amber);margin-top:1px;}
+.c-tag  {font-size:.58rem;font-weight:700;color:#fff;background:var(--blue);padding:.08rem .4rem;border-radius:100px;margin-top:2px;display:inline-block;letter-spacing:.01em;}
 /* per-type colours */
 .lc-am   {color:#1a7a6a;}.lc-pm   {color:#3a7a1a;}
 .lc-ot   {color:#5c3aaa;}.lc-mid  {color:#a05a00;}
@@ -804,6 +805,11 @@ details.card>summary::-webkit-details-marker{display:none;}
       </div>
     </div>
     <div class="frow mt3"><label>Note (optional)</label><input type="text" id="cm-n" placeholder="e.g. covering for Ali"></div>
+    <div class="frow">
+      <label>Teams Tag <span style="font-weight:400;color:var(--grey-400);font-size:.75rem">— who handles this shift</span></label>
+      <input type="text" id="cm-tag" placeholder="e.g. @Fayez or #Calls" style="margin-bottom:.4rem">
+      <div id="cm-tag-quick" style="display:flex;flex-wrap:wrap;gap:.35rem;margin-top:.15rem"></div>
+    </div>
     <div class="flex gap-2 jb mt4">
       <button class="btn btn-danger btn-xs" id="btn-clear-cell">Clear cell</button>
       <div class="flex gap-2"><button class="btn btn-ghost" id="btn-cancel-cell">Cancel</button><button class="btn btn-green" id="btn-save-cell">Save</button></div>
@@ -1574,7 +1580,7 @@ async function removeFromSchedule(empName, day){
   if(!draft)return;
   const row=draft.rows.find(r=>r.name===empName);
   if(!row)return;
-  row.days[day]={shift:'',start:'',end:'',task:'—',note:'',fromReq:false};
+  row.days[day]={shift:'',start:'',end:'',task:'—',note:'',tag:'',fromReq:false};
   try{
     await _db.collection('weeks').doc(draft.id).update({rows:JSON.stringify(draft.rows)});
     if(el('page-build').classList.contains('active')) renderBuild();
@@ -1655,7 +1661,8 @@ function buildSchedTable(tblId, week, editable){
         div.innerHTML=`<span class="c-shift ${lc}">${shift||'—'}</span>
           ${timeStr?`<span class="c-times">${timeStr}</span>`:''}
           ${editable&&c.task&&c.task!=='—'?`<span class="c-task" style="color:var(--t3)">${c.task}</span>`:''}
-          ${c.note?`<span class="c-note">${c.note}</span>`:''}`;
+          ${c.note?`<span class="c-note">${c.note}</span>`:''}
+          ${c.tag?`<span class="c-tag">${c.tag}</span>`:''}`;
       }
       td.appendChild(div);
     });
@@ -1681,6 +1688,29 @@ function openCellModal(empName,day,cell,wid){
     if(ab) ab.className='stype-btn sel'+(cellShiftType==='OFF'?' sel-off':cellShiftType==='OT'?' sel-over':'');
   }
   el('cm-s').value=cell.start||'';el('cm-e').value=cell.end||'';el('cm-n').value=cell.note||'';
+  el('cm-tag').value=cell.tag||'';
+  // Quick-tag buttons — employee names + common topics
+  const tagWrap=el('cm-tag-quick');
+  const tagOptions=[
+    ...emps.map(e=>'@'+e.name.split(' ')[0]),
+    '#Calls','#Zendesk','#Emails','#Escalations','#Follow-up'
+  ];
+  tagWrap.innerHTML=tagOptions.map(t=>`
+    <button type="button" class="tag-quick-btn${cell.tag===t?' active':''}" data-tag="${t}"
+      style="font-size:.72rem;font-weight:600;padding:.18rem .55rem;border-radius:100px;border:1.5px solid var(--grey-200);background:var(--grey-50);color:var(--grey-600);cursor:pointer;transition:all .12s">
+      ${t}
+    </button>`).join('');
+  tagWrap.querySelectorAll('.tag-quick-btn').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const isActive=el('cm-tag').value===btn.dataset.tag;
+      el('cm-tag').value=isActive?'':btn.dataset.tag;
+      tagWrap.querySelectorAll('.tag-quick-btn').forEach(b=>{
+        b.style.background=b.dataset.tag===el('cm-tag').value?'var(--primary)':'var(--grey-50)';
+        b.style.color=b.dataset.tag===el('cm-tag').value?'#fff':'var(--grey-600)';
+        b.style.borderColor=b.dataset.tag===el('cm-tag').value?'var(--primary)':'var(--grey-200)';
+      });
+    });
+  });
   toggleTimes(cellShiftType);
   // Hint from approved request — scoped to this specific week
   const req=approvedMap[wid]?.[empName];
@@ -1711,7 +1741,7 @@ async function saveCell(){
   const empName=el('cm-emp').value,day=el('cm-day').value,wid=el('cm-wid').value;
   const week=getWeek(wid);if(!week)return;
   const row=week.rows.find(r=>r.name===empName);if(!row)return;
-  row.days[day]={shift:cellShiftType,start:el('cm-s').value,end:el('cm-e').value,task:row.days[day]?.task||'—',note:el('cm-n').value.trim(),fromReq:false};
+  row.days[day]={shift:cellShiftType,start:el('cm-s').value,end:el('cm-e').value,task:row.days[day]?.task||'—',note:el('cm-n').value.trim(),tag:el('cm-tag').value.trim(),fromReq:false};
   try{
     await _db.collection('weeks').doc(wid).update({rows:JSON.stringify(week.rows)});
     closeM('cell-modal');renderBuild();toast('Saved','ok');
@@ -1721,7 +1751,7 @@ async function clearCell(){
   const empName=el('cm-emp').value,day=el('cm-day').value,wid=el('cm-wid').value;
   const week=getWeek(wid);if(!week)return;
   const row=week.rows.find(r=>r.name===empName);if(!row)return;
-  row.days[day]={shift:'',start:'',end:'',task:'—',note:'',fromReq:false};
+  row.days[day]={shift:'',start:'',end:'',task:'—',note:'',tag:'',fromReq:false};
   try{
     await _db.collection('weeks').doc(wid).update({rows:JSON.stringify(week.rows)});
     closeM('cell-modal');renderBuild();toast('Cell cleared','ok');
