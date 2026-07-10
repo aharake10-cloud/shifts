@@ -261,7 +261,7 @@ select option{background:var(--white);}
 .lc-am   {color:#1a7a6a;}.lc-pm   {color:#3a7a1a;}
 .lc-ot   {color:#5c3aaa;}.lc-mid  {color:#a05a00;}
 .lc-off  {color:var(--red);}.lc-paid,.lc-leave{color:#5c3aaa;}
-.lc-calls{color:#1a7a6a;}.lc-zendesk{color:#3a7a1a;}.lc-emails{color:var(--blue);}
+.lc-calls{color:#1a7a6a;}.lc-zendesk{color:#3a7a1a;}.lc-emails{color:var(--blue);}.lc-teams{color:#5558d9;}
 
 /* ─── MODAL ─── */
 .overlay{display:none;position:fixed;inset:0;background:rgba(26,31,20,.55);z-index:200;align-items:center;justify-content:center;padding:1rem;}
@@ -1091,7 +1091,7 @@ const TASKS=['Calls','Zendesk','Emails'];
 const TCLS={Calls:'b-calls',Zendesk:'b-zendesk',Emails:'b-emails'};
 const SHIFT_BG={AM:'c-am',PM:'c-pm',Mid:'c-mid',OT:'c-ot',OFF:'c-off',Paid:'c-paid',Leave:'c-leave'};
 const SHIFT_LC={AM:'lc-am',PM:'lc-pm',Mid:'lc-mid',OT:'lc-ot',OFF:'lc-off',Paid:'lc-paid',Leave:'lc-leave'};
-const TASK_LC={Calls:'lc-calls',Zendesk:'lc-zendesk',Emails:'lc-emails'};
+const TASK_LC={Calls:'lc-calls',Zendesk:'lc-zendesk',Emails:'lc-emails',Teams:'lc-teams'};
 const DEF={AM:{s:'08:00',e:'15:30'},PM:{s:'15:30',e:'23:00'},Mid:{s:'12:00',e:'19:30'},OT:{s:'23:00',e:'07:00'},OFF:{s:'',e:''},Paid:{s:'',e:''},Leave:{s:'',e:''}};
 
 let fb,db,auth;
@@ -1651,16 +1651,18 @@ function buildSchedTable(tblId, week, editable){
       const shift=c.shift||'';
       const timeStr=c.start&&c.end?`${c.start}–${c.end}`:'';
       const isOff=shift==='OFF'||shift==='Paid'||shift==='Leave';
+      // If a Teams tag is set, treat task display as "Teams"
+      const displayTask=c.tag?'Teams':(c.task||'—');
+      const displayTlc=TASK_LC[displayTask]||'';
 
       if(view==='tasks'&&!editable){
         // Tasks only view
-        const tlc=TASK_LC[c.task]||'';
-        div.innerHTML=`<span class="c-shift ${lc}">${shift||'—'}</span>${!isOff&&c.task&&c.task!=='—'?`<span class="c-task ${tlc}">${c.task}</span>`:''}`;
+        div.innerHTML=`<span class="c-shift ${lc}">${shift||'—'}</span>${!isOff&&displayTask&&displayTask!=='—'?`<span class="c-task ${displayTlc}">${displayTask}</span>`:''}`;
       } else {
         // Times view (or build page)
         div.innerHTML=`<span class="c-shift ${lc}">${shift||'—'}</span>
           ${timeStr?`<span class="c-times">${timeStr}</span>`:''}
-          ${editable&&c.task&&c.task!=='—'?`<span class="c-task" style="color:var(--t3)">${c.task}</span>`:''}
+          ${editable&&displayTask&&displayTask!=='—'?`<span class="c-task ${displayTlc}">${displayTask}</span>`:''}
           ${c.note?`<span class="c-note">${c.note}</span>`:''}
           ${c.tag?`<span class="c-tag">${c.tag}</span>`:''}`;
       }
@@ -3320,11 +3322,13 @@ function renderPortalDays(){
       const shift=c.shift||'';
       const timeStr=c.start&&c.end?`${c.start}–${c.end}`:'';
       const isOff=shift==='OFF'||shift==='Paid'||shift==='Leave';
-      const tlc=TASK_LC[c.task]||'';
+      const displayTask=c.tag?'Teams':(c.task||'—');
+      const tlc=TASK_LC[displayTask]||'';
 
       div.innerHTML=`<span class="c-shift ${lc}" style="font-size:.58rem">${shift||'—'}</span>
         ${timeStr?`<span class="c-times" style="font-size:.6rem">${timeStr}</span>`:''}
-        ${!isOff&&c.task&&c.task!=='—'?`<span class="c-task ${tlc}" style="font-size:.55rem">${c.task}</span>`:''}`;
+        ${!isOff&&displayTask&&displayTask!=='—'?`<span class="c-task ${tlc}" style="font-size:.55rem">${displayTask}</span>`:''}
+        ${c.tag?`<span class="c-tag" style="font-size:.52rem">${c.tag}</span>`:''}`;
       td.appendChild(div);
     });
   });
@@ -3336,7 +3340,7 @@ function renderPortalDays(){
   // Legend
   const legend=document.createElement('div');
   legend.style.cssText='display:flex;gap:.75rem;flex-wrap:wrap;margin-top:.75rem;font-size:.72rem;font-weight:600;align-items:center;color:var(--grey-400)';
-  legend.innerHTML='<span style="color:#1a7a6a">● AM</span><span style="color:#3a7a1a">● PM</span><span style="color:#a05a00">● Mid</span><span style="color:#5c3aaa">● Overnight</span><span style="color:var(--red)">● OFF</span><span style="color:#1a7a6a">● Calls</span><span style="color:#3a7a1a">● Zendesk</span><span style="color:#2563eb">● Emails</span>';
+  legend.innerHTML='<span style="color:#1a7a6a">● AM</span><span style="color:#3a7a1a">● PM</span><span style="color:#a05a00">● Mid</span><span style="color:#5c3aaa">● Overnight</span><span style="color:var(--red)">● OFF</span><span style="color:#1a7a6a">● Calls</span><span style="color:#3a7a1a">● Zendesk</span><span style="color:#2563eb">● Emails</span><span style="color:#5558d9">● Teams</span>';
   wrap.appendChild(legend);
 }
 
