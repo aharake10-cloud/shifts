@@ -805,10 +805,11 @@ details.card>summary::-webkit-details-marker{display:none;}
       </div>
     </div>
     <div class="frow mt3"><label>Note (optional)</label><input type="text" id="cm-n" placeholder="e.g. covering for Ali"></div>
-    <div class="frow">
-      <label>Teams Tag <span style="font-weight:400;color:var(--grey-400);font-size:.75rem">— who handles this shift</span></label>
-      <input type="text" id="cm-tag" placeholder="e.g. @Fayez or #Calls" style="margin-bottom:.4rem">
-      <div id="cm-tag-quick" style="display:flex;flex-wrap:wrap;gap:.35rem;margin-top:.15rem"></div>
+    <div class="frow" style="flex-direction:row;align-items:center;gap:.75rem;margin-top:.75rem">
+      <label style="margin:0;flex-shrink:0">Task</label>
+      <button type="button" id="btn-cm-teams" style="display:flex;align-items:center;gap:.45rem;padding:.4rem .9rem;border-radius:100px;border:2px solid var(--grey-200);background:var(--grey-50);color:var(--grey-500);font-weight:700;font-size:.82rem;cursor:pointer;transition:all .15s">
+        <span>🔵</span> Teams
+      </button>
     </div>
     <div class="flex gap-2 jb mt4">
       <button class="btn btn-danger btn-xs" id="btn-clear-cell">Clear cell</button>
@@ -1656,15 +1657,12 @@ function buildSchedTable(tblId, week, editable){
       const displayTlc=TASK_LC[displayTask]||'';
 
       if(view==='tasks'&&!editable){
-        // Tasks only view — show Teams + tag name merged
-        div.innerHTML=`<span class="c-shift ${lc}">${shift||'—'}</span>${!isOff&&displayTask&&displayTask!=='—'?`<span class="c-task ${displayTlc}">${displayTask}${c.tag?' · '+c.tag:''}</span>`:''}`;
+        div.innerHTML=`<span class="c-shift ${lc}">${shift||'—'}</span>${!isOff&&displayTask&&displayTask!=='—'?`<span class="c-task ${displayTlc}">${displayTask}</span>`:''}`;
       } else {
-        // Times view (or build page) — show tag as separate pill so admin can see it clearly
         div.innerHTML=`<span class="c-shift ${lc}">${shift||'—'}</span>
           ${timeStr?`<span class="c-times">${timeStr}</span>`:''}
-          ${editable&&displayTask&&displayTask!=='—'?`<span class="c-task ${displayTlc}">${displayTask}</span>`:''}
-          ${c.note?`<span class="c-note">${c.note}</span>`:''}
-          ${c.tag?`<span class="c-tag">${c.tag}</span>`:''}`;
+          ${!isOff&&displayTask&&displayTask!=='—'?`<span class="c-task ${displayTlc}">${displayTask}</span>`:''}
+          ${c.note?`<span class="c-note">${c.note}</span>`:''}`;
       }
       td.appendChild(div);
     });
@@ -1680,6 +1678,15 @@ function dayDate(start,day){
 // ══════════════════════════════════════
 // CELL MODAL
 // ══════════════════════════════════════
+function setCmTeams(on){
+  const btn=el('btn-cm-teams');
+  btn.dataset.on=on?'true':'false';
+  btn.style.background=on?'#5558d9':'var(--grey-50)';
+  btn.style.color=on?'#fff':'var(--grey-500)';
+  btn.style.borderColor=on?'#5558d9':'var(--grey-200)';
+  btn.onclick=()=>setCmTeams(btn.dataset.on!=='true');
+}
+
 function openCellModal(empName,day,cell,wid){
   el('cm-title').textContent=`${empName} — ${day}`;
   el('cm-emp').value=empName;el('cm-day').value=day;el('cm-wid').value=wid;
@@ -1690,29 +1697,11 @@ function openCellModal(empName,day,cell,wid){
     if(ab) ab.className='stype-btn sel'+(cellShiftType==='OFF'?' sel-off':cellShiftType==='OT'?' sel-over':'');
   }
   el('cm-s').value=cell.start||'';el('cm-e').value=cell.end||'';el('cm-n').value=cell.note||'';
-  el('cm-tag').value=cell.tag||'';
-  // Quick-tag buttons — employee names + common topics
-  const tagWrap=el('cm-tag-quick');
-  const tagOptions=[
-    ...emps.map(e=>'@'+e.name.split(' ')[0]),
-    '#Calls','#Zendesk','#Emails','#Escalations','#Follow-up'
-  ];
-  tagWrap.innerHTML=tagOptions.map(t=>`
-    <button type="button" class="tag-quick-btn${cell.tag===t?' active':''}" data-tag="${t}"
-      style="font-size:.72rem;font-weight:600;padding:.18rem .55rem;border-radius:100px;border:1.5px solid var(--grey-200);background:var(--grey-50);color:var(--grey-600);cursor:pointer;transition:all .12s">
-      ${t}
-    </button>`).join('');
-  tagWrap.querySelectorAll('.tag-quick-btn').forEach(btn=>{
-    btn.addEventListener('click',()=>{
-      const isActive=el('cm-tag').value===btn.dataset.tag;
-      el('cm-tag').value=isActive?'':btn.dataset.tag;
-      tagWrap.querySelectorAll('.tag-quick-btn').forEach(b=>{
-        b.style.background=b.dataset.tag===el('cm-tag').value?'var(--primary)':'var(--grey-50)';
-        b.style.color=b.dataset.tag===el('cm-tag').value?'#fff':'var(--grey-600)';
-        b.style.borderColor=b.dataset.tag===el('cm-tag').value?'var(--primary)':'var(--grey-200)';
-      });
-    });
-  });
+  // Teams toggle button
+  const teamsBtn=el('btn-cm-teams');
+  const teamsOn=!!(cell.tag==='teams'||cell.tag==='Teams');
+  setCmTeams(teamsOn);
+  teamsBtn.onclick=()=>setCmTeams(!teamsBtn.dataset.on==='true');
   toggleTimes(cellShiftType);
   // Hint from approved request — scoped to this specific week
   const req=approvedMap[wid]?.[empName];
@@ -1743,7 +1732,8 @@ async function saveCell(){
   const empName=el('cm-emp').value,day=el('cm-day').value,wid=el('cm-wid').value;
   const week=getWeek(wid);if(!week)return;
   const row=week.rows.find(r=>r.name===empName);if(!row)return;
-  row.days[day]={shift:cellShiftType,start:el('cm-s').value,end:el('cm-e').value,task:row.days[day]?.task||'—',note:el('cm-n').value.trim(),tag:el('cm-tag').value.trim(),fromReq:false};
+  const teamsOn=el('btn-cm-teams')?.dataset.on==='true';
+  row.days[day]={shift:cellShiftType,start:el('cm-s').value,end:el('cm-e').value,task:row.days[day]?.task||'—',note:el('cm-n').value.trim(),tag:teamsOn?'teams':'',fromReq:false};
   try{
     await _db.collection('weeks').doc(wid).update({rows:JSON.stringify(week.rows)});
     closeM('cell-modal');renderBuild();toast('Saved','ok');
@@ -3327,7 +3317,7 @@ function renderPortalDays(){
 
       div.innerHTML=`<span class="c-shift ${lc}" style="font-size:.58rem">${shift||'—'}</span>
         ${timeStr?`<span class="c-times" style="font-size:.6rem">${timeStr}</span>`:''}
-        ${!isOff&&displayTask&&displayTask!=='—'?`<span class="c-task ${tlc}" style="font-size:.55rem">${displayTask}${c.tag?' · '+c.tag:''}</span>`:''}`;
+        ${!isOff&&displayTask&&displayTask!=='—'?`<span class="c-task ${tlc}" style="font-size:.55rem">${displayTask}</span>`:''}`;
       td.appendChild(div);
     });
   });
@@ -3963,6 +3953,7 @@ window.toggleVolumeWeek=toggleVolumeWeek;
 window.loadVolumeFromFirestore=loadVolumeFromFirestore;
 window.exportAnalyticsExcel=exportAnalyticsExcel; window.deleteCurrentAnalyticsWeek=deleteCurrentAnalyticsWeek;
 window.openCellModal=openCellModal; window.saveCell=saveCell; window.clearCell=clearCell;
+window.setCmTeams=setCmTeams;
 window.pickType=pickType; window.loadRequests=loadRequests; window.filterReqs=filterReqs;
 window.appDay=appDay; window.appAll=appAll; window.rejAll=rejAll;
 window.switchReqTab=switchReqTab; window.filterSwitch=filterSwitch;
