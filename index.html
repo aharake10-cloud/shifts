@@ -1656,10 +1656,10 @@ function buildSchedTable(tblId, week, editable){
       const displayTlc=TASK_LC[displayTask]||'';
 
       if(view==='tasks'&&!editable){
-        // Tasks only view
-        div.innerHTML=`<span class="c-shift ${lc}">${shift||'—'}</span>${!isOff&&displayTask&&displayTask!=='—'?`<span class="c-task ${displayTlc}">${displayTask}</span>`:''}`;
+        // Tasks only view — show Teams + tag name merged
+        div.innerHTML=`<span class="c-shift ${lc}">${shift||'—'}</span>${!isOff&&displayTask&&displayTask!=='—'?`<span class="c-task ${displayTlc}">${displayTask}${c.tag?' · '+c.tag:''}</span>`:''}`;
       } else {
-        // Times view (or build page)
+        // Times view (or build page) — show tag as separate pill so admin can see it clearly
         div.innerHTML=`<span class="c-shift ${lc}">${shift||'—'}</span>
           ${timeStr?`<span class="c-times">${timeStr}</span>`:''}
           ${editable&&displayTask&&displayTask!=='—'?`<span class="c-task ${displayTlc}">${displayTask}</span>`:''}
@@ -3238,7 +3238,7 @@ function renderPortalDays(){
   statsBar.style.cssText='display:flex;gap:.65rem;flex-wrap:wrap;margin-bottom:1.25rem';
   const statItems=[
     {label:'Today',val:todayName||'—',sub:myToday.shift?myToday.shift+(myToday.start?' · '+myToday.start+'–'+myToday.end:''):'No shift',color:'var(--primary)'},
-    {label:'My Task',val:myToday.task&&myToday.task!=='—'?myToday.task:'—',color:'#1a7a6a'},
+    {label:'My Task',val:myToday.tag?'Teams':(myToday.task&&myToday.task!=='—'?myToday.task:'—'),color:myToday.tag?'#5558d9':'#1a7a6a'},
     {label:'Team',val:portalWeek.rows.length+' people',color:'var(--blue)'},
   ];
   statsBar.innerHTML=statItems.map(s=>`
@@ -3327,8 +3327,7 @@ function renderPortalDays(){
 
       div.innerHTML=`<span class="c-shift ${lc}" style="font-size:.58rem">${shift||'—'}</span>
         ${timeStr?`<span class="c-times" style="font-size:.6rem">${timeStr}</span>`:''}
-        ${!isOff&&displayTask&&displayTask!=='—'?`<span class="c-task ${tlc}" style="font-size:.55rem">${displayTask}</span>`:''}
-        ${c.tag?`<span class="c-tag" style="font-size:.52rem">${c.tag}</span>`:''}`;
+        ${!isOff&&displayTask&&displayTask!=='—'?`<span class="c-task ${tlc}" style="font-size:.55rem">${displayTask}${c.tag?' · '+c.tag:''}</span>`:''}`;
       td.appendChild(div);
     });
   });
