@@ -1685,18 +1685,29 @@ function dayDate(start,day){
 // ══════════════════════════════════════
 // CELL MODAL
 // ══════════════════════════════════════
+// Active tag state — single source of truth
+let _cmActiveTag='';
+
 function setCmTag(tag){
+  _cmActiveTag=tag;
   const teamsBtn=el('btn-cm-teams');
   const callsBtn=el('btn-cm-calls');
   if(!teamsBtn||!callsBtn) return;
 
-  teamsBtn.dataset.activeTag=tag;
-
   const teamsOn=tag==='teams';
-  teamsBtn.style.cssText=`display:flex;align-items:center;gap:.45rem;padding:.4rem .9rem;border-radius:100px;border:2px solid ${teamsOn?'#5558d9':'var(--grey-200)'};background:${teamsOn?'#5558d9':'var(--grey-50)'};color:${teamsOn?'#fff':'var(--grey-500)'};font-weight:700;font-size:.82rem;cursor:pointer;transition:all .15s`;
-
   const callsOn=tag==='calls';
-  callsBtn.style.cssText=`display:flex;align-items:center;gap:.45rem;padding:.4rem .9rem;border-radius:100px;border:2px solid ${callsOn?'#1a7a6a':'var(--grey-200)'};background:${callsOn?'#1a7a6a':'var(--grey-50)'};color:${callsOn?'#fff':'var(--grey-500)'};font-weight:700;font-size:.82rem;cursor:pointer;transition:all .15s`;
+
+  teamsBtn.style.background=teamsOn?'#5558d9':'var(--grey-50)';
+  teamsBtn.style.color=teamsOn?'#fff':'var(--grey-500)';
+  teamsBtn.style.borderColor=teamsOn?'#5558d9':'var(--grey-200)';
+
+  callsBtn.style.background=callsOn?'#1a7a6a':'var(--grey-50)';
+  callsBtn.style.color=callsOn?'#fff':'var(--grey-500)';
+  callsBtn.style.borderColor=callsOn?'#1a7a6a':'var(--grey-200)';
+
+  // Use onclick (not addEventListener) so there's always exactly one handler
+  teamsBtn.onclick=()=>setCmTag(_cmActiveTag==='teams'?'':'teams');
+  callsBtn.onclick=()=>setCmTag(_cmActiveTag==='calls'?'':'calls');
 }
 
 function setCmTeams(on){ setCmTag(on?'teams':''); }
@@ -1744,8 +1755,7 @@ async function saveCell(){
   const empName=el('cm-emp').value,day=el('cm-day').value,wid=el('cm-wid').value;
   const week=getWeek(wid);if(!week)return;
   const row=week.rows.find(r=>r.name===empName);if(!row)return;
-  const activeTag=el('btn-cm-teams')?.dataset.activeTag||'';
-  row.days[day]={shift:cellShiftType,start:el('cm-s').value,end:el('cm-e').value,task:row.days[day]?.task||'—',note:el('cm-n').value.trim(),tag:activeTag,fromReq:false};
+  row.days[day]={shift:cellShiftType,start:el('cm-s').value,end:el('cm-e').value,task:row.days[day]?.task||'—',note:el('cm-n').value.trim(),tag:_cmActiveTag,fromReq:false};
   try{
     await _db.collection('weeks').doc(wid).update({rows:JSON.stringify(week.rows)});
     closeM('cell-modal');renderBuild();toast('Saved','ok');
@@ -4114,8 +4124,6 @@ wire('btn-del-emp',      delEmp);
 wire('btn-save-cell',    saveCell);
 wire('btn-clear-cell',   clearCell);
 wire('btn-cancel-cell',  ()=>closeM('cell-modal'));
-wire('btn-cm-teams',     ()=>setCmTag(el('btn-cm-teams').dataset.activeTag==='teams'?'':'teams'));
-wire('btn-cm-calls',     ()=>setCmTag(el('btn-cm-teams').dataset.activeTag==='calls'?'':'calls'));
 wire('btn-cancel-nw',    ()=>closeM('nw-modal'));
 wire('btn-cancel-emp',   ()=>closeM('emp-modal'));
 wire('btn-submit-form',  submitForm);
