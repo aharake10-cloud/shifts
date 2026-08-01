@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ShiftFlow</title>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
@@ -558,7 +559,8 @@ details.card>summary::-webkit-details-marker{display:none;}
             <button class="vt-btn active" id="vt-times">⏰ Times</button>
             <button class="vt-btn" id="vt-tasks">✅ Tasks</button>
           </div>
-          <button class="btn btn-white btn-sm" id="btn-export">↓ Export</button>
+          <button class="btn btn-white btn-sm" id="btn-export">↓ Export Excel</button>
+          <button class="btn btn-white btn-sm" id="btn-export-img">🖼 Export Image</button>
         </div>
       </div>
       <div id="sched-wbar"></div>
@@ -810,7 +812,10 @@ details.card>summary::-webkit-details-marker{display:none;}
     <div class="frow" style="flex-direction:row;align-items:center;gap:.75rem;margin-top:.75rem">
       <label style="margin:0;flex-shrink:0">Task</label>
       <button type="button" id="btn-cm-teams" style="display:flex;align-items:center;gap:.45rem;padding:.4rem .9rem;border-radius:100px;border:2px solid var(--grey-200);background:var(--grey-50);color:var(--grey-500);font-weight:700;font-size:.82rem;cursor:pointer;transition:all .15s">
-        <span>🔵</span> Teams
+        🔵 Teams
+      </button>
+      <button type="button" id="btn-cm-calls" style="display:flex;align-items:center;gap:.45rem;padding:.4rem .9rem;border-radius:100px;border:2px solid var(--grey-200);background:var(--grey-50);color:var(--grey-500);font-weight:700;font-size:.82rem;cursor:pointer;transition:all .15s">
+        📞 Calls
       </button>
     </div>
     <div class="flex gap-2 jb mt4">
@@ -1655,7 +1660,7 @@ function buildSchedTable(tblId, week, editable){
       const timeStr=c.start&&c.end?`${c.start}–${c.end}`:'';
       const isOff=shift==='OFF'||shift==='Paid'||shift==='Leave';
       // If a Teams tag is set, treat task display as "Teams"
-      const displayTask=c.tag?'Teams':(c.task||'—');
+      const displayTask=c.tag==='calls'?'Calls':c.tag==='teams'?'Teams':(c.task||'—');
       const displayTlc=TASK_LC[displayTask]||'';
 
       if(view==='tasks'&&!editable){
@@ -1680,14 +1685,34 @@ function dayDate(start,day){
 // ══════════════════════════════════════
 // CELL MODAL
 // ══════════════════════════════════════
-function setCmTeams(on){
-  const btn=el('btn-cm-teams');
-  btn.dataset.on=on?'true':'false';
-  btn.style.background=on?'#5558d9':'var(--grey-50)';
-  btn.style.color=on?'#fff':'var(--grey-500)';
-  btn.style.borderColor=on?'#5558d9':'var(--grey-200)';
-  btn.onclick=()=>setCmTeams(btn.dataset.on!=='true');
+function setCmTag(tag){
+  // tag = 'teams' | 'calls' | '' (clear)
+  const teamsBtn=el('btn-cm-teams');
+  const callsBtn=el('btn-cm-calls');
+  if(!teamsBtn||!callsBtn) return;
+
+  // Store active tag on a hidden data attr on the teams button (reuse as state holder)
+  teamsBtn.dataset.activeTag=tag;
+
+  // Teams button
+  const teamsOn=tag==='teams';
+  teamsBtn.style.background=teamsOn?'#5558d9':'var(--grey-50)';
+  teamsBtn.style.color=teamsOn?'#fff':'var(--grey-500)';
+  teamsBtn.style.borderColor=teamsOn?'#5558d9':'var(--grey-200)';
+
+  // Calls button
+  const callsOn=tag==='calls';
+  callsBtn.style.background=callsOn?'#1a7a6a':'var(--grey-50)';
+  callsBtn.style.color=callsOn?'#fff':'var(--grey-500)';
+  callsBtn.style.borderColor=callsOn?'#1a7a6a':'var(--grey-200)';
+
+  // Click handlers — toggle off if already active
+  teamsBtn.onclick=()=>setCmTag(teamsBtn.dataset.activeTag==='teams'?'':'teams');
+  callsBtn.onclick=()=>setCmTag(teamsBtn.dataset.activeTag==='calls'?'':'calls');
 }
+
+// Keep old name as alias for any existing calls
+function setCmTeams(on){ setCmTag(on?'teams':''); }
 
 function openCellModal(empName,day,cell,wid){
   el('cm-title').textContent=`${empName} — ${day}`;
@@ -1699,11 +1724,9 @@ function openCellModal(empName,day,cell,wid){
     if(ab) ab.className='stype-btn sel'+(cellShiftType==='OFF'?' sel-off':cellShiftType==='OT'?' sel-over':'');
   }
   el('cm-s').value=cell.start||'';el('cm-e').value=cell.end||'';el('cm-n').value=cell.note||'';
-  // Teams toggle button
-  const teamsBtn=el('btn-cm-teams');
-  const teamsOn=!!(cell.tag==='teams'||cell.tag==='Teams');
-  setCmTeams(teamsOn);
-  teamsBtn.onclick=()=>setCmTeams(!teamsBtn.dataset.on==='true');
+  // Task tag toggle
+  const tagVal=(cell.tag||'').toLowerCase();
+  setCmTag(tagVal==='teams'?'teams':tagVal==='calls'?'calls':'');
   toggleTimes(cellShiftType);
   // Hint from approved request — scoped to this specific week
   const req=approvedMap[wid]?.[empName];
@@ -1734,8 +1757,8 @@ async function saveCell(){
   const empName=el('cm-emp').value,day=el('cm-day').value,wid=el('cm-wid').value;
   const week=getWeek(wid);if(!week)return;
   const row=week.rows.find(r=>r.name===empName);if(!row)return;
-  const teamsOn=el('btn-cm-teams')?.dataset.on==='true';
-  row.days[day]={shift:cellShiftType,start:el('cm-s').value,end:el('cm-e').value,task:row.days[day]?.task||'—',note:el('cm-n').value.trim(),tag:teamsOn?'teams':'',fromReq:false};
+  const activeTag=el('btn-cm-teams')?.dataset.activeTag||'';
+  row.days[day]={shift:cellShiftType,start:el('cm-s').value,end:el('cm-e').value,task:row.days[day]?.task||'—',note:el('cm-n').value.trim(),tag:activeTag,fromReq:false};
   try{
     await _db.collection('weeks').doc(wid).update({rows:JSON.stringify(week.rows)});
     closeM('cell-modal');renderBuild();toast('Saved','ok');
@@ -2638,6 +2661,70 @@ function exportAnalyticsExcel(){
   toast('Excel exported!','ok');
 }
 
+async function exportScheduleImage(){
+  const week=getWeek(activeWid);
+  if(!week){toast('No schedule to export','err');return;}
+  if(typeof html2canvas==='undefined'){toast('html2canvas not loaded','err');return;}
+
+  const btn=el('btn-export-img');
+  btn.disabled=true;btn.textContent='⏳ Rendering…';
+
+  try{
+    // Capture the schedule outer wrapper (includes the table but not the nav/header)
+    const target=document.querySelector('#page-schedule .sched-outer');
+    if(!target){toast('Schedule not visible','err');btn.disabled=false;btn.textContent='🖼 Export Image';return;}
+
+    const canvas=await html2canvas(target,{
+      backgroundColor:'#ffffff',
+      scale:2, // retina quality
+      useCORS:true,
+      logging:false,
+      // Give a bit of padding by wrapping in a temp container
+    });
+
+    // Add padding + title banner above the captured canvas
+    const padTop=56,padSide=24,padBottom=24;
+    const out=document.createElement('canvas');
+    out.width=canvas.width+padSide*2;
+    out.height=canvas.height+padTop+padBottom;
+    const ctx=out.getContext('2d');
+
+    // White background
+    ctx.fillStyle='#ffffff';
+    ctx.fillRect(0,0,out.width,out.height);
+
+    // Title bar
+    ctx.fillStyle='#f0233c';
+    ctx.fillRect(0,0,out.width,padTop);
+    ctx.fillStyle='#ffffff';
+    ctx.font=`bold ${16*2}px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif`;
+    ctx.textBaseline='middle';
+    ctx.fillText('ShiftFlow — '+week.label,16*2,padTop/2);
+
+    // Date range on the right
+    if(week.startDate&&week.endDate){
+      const range=fmtDate(week.startDate)+' – '+fmtDate(week.endDate);
+      ctx.font=`${12*2}px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif`;
+      ctx.fillStyle='rgba(255,255,255,.8)';
+      ctx.textAlign='right';
+      ctx.fillText(range,out.width-16*2,padTop/2);
+    }
+
+    // Paste the schedule table
+    ctx.drawImage(canvas,padSide,padTop);
+
+    // Download
+    const a=document.createElement('a');
+    a.href=out.toDataURL('image/png');
+    a.download=`schedule_${(week.label||'week').replace(/\s+/g,'_')}.png`;
+    a.click();
+    toast('Image downloaded!','ok');
+  }catch(e){
+    toast('Error: '+e.message,'err');
+  }
+  btn.disabled=false;btn.textContent='🖼 Export Image';
+}
+
 function exportExcel(){
   const week=getWeek(activeWid);if(!week){toast('No schedule','err');return;}
   if(typeof XLSX==='undefined'){toast('XLSX not loaded','err');return;}
@@ -3314,7 +3401,7 @@ function renderPortalDays(){
       const shift=c.shift||'';
       const timeStr=c.start&&c.end?`${c.start}–${c.end}`:'';
       const isOff=shift==='OFF'||shift==='Paid'||shift==='Leave';
-      const displayTask=c.tag?'Teams':(c.task||'—');
+      const displayTask=c.tag==='calls'?'Calls':c.tag==='teams'?'Teams':(c.task||'—');
       const tlc=TASK_LC[displayTask]||'';
 
       div.innerHTML=`<span class="c-shift ${lc}" style="font-size:.58rem">${shift||'—'}</span>
@@ -3945,6 +4032,7 @@ window.openMobileSidebar=openMobileSidebar; window.closeMobileSidebar=closeMobil
 window.toggleMobileSidebar=toggleMobileSidebar;
 window.applyApprovedRequestsToWeek=applyApprovedRequestsToWeek;
 window.assignTasksAndSave=assignTasksAndSave; window.exportExcel=exportExcel;
+window.exportScheduleImage=exportScheduleImage;
 window.handleAnalyticsFile=handleAnalyticsFile; window.resetAnalytics=resetAnalytics;
 window.renderFlaggedTicketsFiltered=renderFlaggedTicketsFiltered;
 window.addVolumeWeek=addVolumeWeek; window.removeVolumeWeek=removeVolumeWeek;
@@ -3955,7 +4043,7 @@ window.toggleVolumeWeek=toggleVolumeWeek;
 window.loadVolumeFromFirestore=loadVolumeFromFirestore;
 window.exportAnalyticsExcel=exportAnalyticsExcel; window.deleteCurrentAnalyticsWeek=deleteCurrentAnalyticsWeek;
 window.openCellModal=openCellModal; window.saveCell=saveCell; window.clearCell=clearCell;
-window.setCmTeams=setCmTeams;
+window.setCmTeams=setCmTeams; window.setCmTag=setCmTag;
 window.pickType=pickType; window.loadRequests=loadRequests; window.filterReqs=filterReqs;
 window.appDay=appDay; window.appAll=appAll; window.rejAll=rejAll;
 window.switchReqTab=switchReqTab; window.filterSwitch=filterSwitch;
@@ -3997,6 +4085,7 @@ wire('sidebar-scrim',   closeMobileSidebar);
 
 // Schedule
 wire('btn-export',       exportExcel);
+wire('btn-export-img',   exportScheduleImage);
 
 // Analytics
 wire('btn-vol-addweek',     ()=>addVolumeWeek());
