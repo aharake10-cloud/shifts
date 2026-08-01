@@ -1686,25 +1686,17 @@ function dayDate(start,day){
 // CELL MODAL
 // ══════════════════════════════════════
 function setCmTag(tag){
-  // tag = 'teams' | 'calls' | '' — only one can be active at a time
   const teamsBtn=el('btn-cm-teams');
   const callsBtn=el('btn-cm-calls');
   if(!teamsBtn||!callsBtn) return;
 
-  // Store on a single shared data attribute
   teamsBtn.dataset.activeTag=tag;
 
-  // Style Teams button
   const teamsOn=tag==='teams';
   teamsBtn.style.cssText=`display:flex;align-items:center;gap:.45rem;padding:.4rem .9rem;border-radius:100px;border:2px solid ${teamsOn?'#5558d9':'var(--grey-200)'};background:${teamsOn?'#5558d9':'var(--grey-50)'};color:${teamsOn?'#fff':'var(--grey-500)'};font-weight:700;font-size:.82rem;cursor:pointer;transition:all .15s`;
 
-  // Style Calls button
   const callsOn=tag==='calls';
   callsBtn.style.cssText=`display:flex;align-items:center;gap:.45rem;padding:.4rem .9rem;border-radius:100px;border:2px solid ${callsOn?'#1a7a6a':'var(--grey-200)'};background:${callsOn?'#1a7a6a':'var(--grey-50)'};color:${callsOn?'#fff':'var(--grey-500)'};font-weight:700;font-size:.82rem;cursor:pointer;transition:all .15s`;
-
-  // Toggle: clicking active one clears it; clicking inactive one sets it
-  teamsBtn.onclick=()=>setCmTag(teamsBtn.dataset.activeTag==='teams'?'':'teams');
-  callsBtn.onclick=()=>setCmTag(teamsBtn.dataset.activeTag==='calls'?'':'calls');
 }
 
 function setCmTeams(on){ setCmTag(on?'teams':''); }
@@ -4122,6 +4114,8 @@ wire('btn-del-emp',      delEmp);
 wire('btn-save-cell',    saveCell);
 wire('btn-clear-cell',   clearCell);
 wire('btn-cancel-cell',  ()=>closeM('cell-modal'));
+wire('btn-cm-teams',     ()=>setCmTag(el('btn-cm-teams').dataset.activeTag==='teams'?'':'teams'));
+wire('btn-cm-calls',     ()=>setCmTag(el('btn-cm-teams').dataset.activeTag==='calls'?'':'calls'));
 wire('btn-cancel-nw',    ()=>closeM('nw-modal'));
 wire('btn-cancel-emp',   ()=>closeM('emp-modal'));
 wire('btn-submit-form',  submitForm);
