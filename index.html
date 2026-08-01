@@ -1660,15 +1660,16 @@ function buildSchedTable(tblId, week, editable){
       const timeStr=c.start&&c.end?`${c.start}–${c.end}`:'';
       const isOff=shift==='OFF'||shift==='Paid'||shift==='Leave';
       // If a Teams tag is set, treat task display as "Teams"
-      const displayTask=c.tag==='calls'?'Calls':c.tag==='teams'?'Teams':(c.task||'—');
-      const displayTlc=TASK_LC[displayTask]||'';
+      const _tags=(c.tag||'').split(',').filter(Boolean);
+      const displayTask=_tags.length?_tags.map(t=>t==='teams'?'Teams':t==='calls'?'Calls':t).join('+'):(c.task||'—');
+      const displayTlcBase=_tags.includes('teams')&&_tags.includes('calls')?'lc-teams':_tags.includes('teams')?'lc-teams':_tags.includes('calls')?'lc-calls':TASK_LC[c.task]||'';
 
       if(view==='tasks'&&!editable){
-        div.innerHTML=`<span class="c-shift ${lc}">${shift||'—'}</span>${!isOff&&displayTask&&displayTask!=='—'?`<span class="c-task ${displayTlc}">${displayTask}</span>`:''}`;
+        div.innerHTML=`<span class="c-shift ${lc}">${shift||'—'}</span>${!isOff&&displayTask&&displayTask!=='—'?`<span class="c-task ${displayTlcBase}">${displayTask}</span>`:''}`;
       } else {
         div.innerHTML=`<span class="c-shift ${lc}">${shift||'—'}</span>
           ${timeStr?`<span class="c-times">${timeStr}</span>`:''}
-          ${!isOff&&displayTask&&displayTask!=='—'?`<span class="c-task ${displayTlc}">${displayTask}</span>`:''}
+          ${!isOff&&displayTask&&displayTask!=='—'?`<span class="c-task ${displayTlcBase}">${displayTask}</span>`:''}
           ${c.note?`<span class="c-note">${c.note}</span>`:''}`;
       }
       td.appendChild(div);
@@ -1722,9 +1723,35 @@ function openCellModal(empName,day,cell,wid){
     if(ab) ab.className='stype-btn sel'+(cellShiftType==='OFF'?' sel-off':cellShiftType==='OT'?' sel-over':'');
   }
   el('cm-s').value=cell.start||'';el('cm-e').value=cell.end||'';el('cm-n').value=cell.note||'';
-  // Task tag toggle
-  const tagVal=(cell.tag||'').toLowerCase();
-  setCmTag(tagVal==='teams'?'teams':tagVal==='calls'?'calls':'');
+  // Task tag buttons — independent toggles, both can be active at once
+  const savedTag=(cell.tag||'');
+  _cmActiveTag=savedTag; // keep full tag string e.g. 'teams', 'calls', 'teams,calls'
+
+  function refreshTagButtons(){
+    const tb=el('btn-cm-teams'),cb=el('btn-cm-calls');
+    if(!tb||!cb) return;
+    const tags=_cmActiveTag.split(',');
+    const ton=tags.includes('teams'),con=tags.includes('calls');
+    tb.style.background=ton?'#5558d9':'var(--grey-50)'; tb.style.color=ton?'#fff':'var(--grey-500)'; tb.style.borderColor=ton?'#5558d9':'var(--grey-200)';
+    cb.style.background=con?'#1a7a6a':'var(--grey-50)'; cb.style.color=con?'#fff':'var(--grey-500)'; cb.style.borderColor=con?'#1a7a6a':'var(--grey-200)';
+  }
+
+  function toggleCmTag(tag){
+    const tags=_cmActiveTag?_cmActiveTag.split(',').filter(Boolean):[];
+    const idx=tags.indexOf(tag);
+    if(idx>=0) tags.splice(idx,1); else tags.push(tag);
+    _cmActiveTag=tags.join(',');
+    refreshTagButtons();
+  }
+
+  const teamsBtn=el('btn-cm-teams'),callsBtn=el('btn-cm-calls');
+  if(teamsBtn&&callsBtn){
+    const newT=teamsBtn.cloneNode(true),newC=callsBtn.cloneNode(true);
+    teamsBtn.replaceWith(newT);callsBtn.replaceWith(newC);
+    refreshTagButtons();
+    newT.addEventListener('click',()=>toggleCmTag('teams'));
+    newC.addEventListener('click',()=>toggleCmTag('calls'));
+  }
   toggleTimes(cellShiftType);
   // Hint from approved request — scoped to this specific week
   const req=approvedMap[wid]?.[empName];
@@ -3398,7 +3425,9 @@ function renderPortalDays(){
       const shift=c.shift||'';
       const timeStr=c.start&&c.end?`${c.start}–${c.end}`:'';
       const isOff=shift==='OFF'||shift==='Paid'||shift==='Leave';
-      const displayTask=c.tag==='calls'?'Calls':c.tag==='teams'?'Teams':(c.task||'—');
+      const _tags=(c.tag||'').split(',').filter(Boolean);
+      const displayTask=_tags.length?_tags.map(t=>t==='teams'?'Teams':t==='calls'?'Calls':t).join('+'):(c.task||'—');
+      const displayTlcBase=_tags.includes('teams')&&_tags.includes('calls')?'lc-teams':_tags.includes('teams')?'lc-teams':_tags.includes('calls')?'lc-calls':TASK_LC[c.task]||'';
       const tlc=TASK_LC[displayTask]||'';
 
       div.innerHTML=`<span class="c-shift ${lc}" style="font-size:.58rem">${shift||'—'}</span>
