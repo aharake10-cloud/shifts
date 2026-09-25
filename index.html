@@ -425,6 +425,48 @@ select option{background:var(--white);}
 .analytics-section-title{font-size:1.15rem;font-weight:800;color:var(--grey-900);letter-spacing:-.01em;}
 .analytics-section-sub{font-size:.82rem;color:var(--grey-400);margin-top:.2rem;}
 
+/* Volume tabs */
+.vol-tabs{display:flex;gap:.4rem;margin-bottom:1.1rem;}
+.vol-tab{padding:.48rem 1.1rem;border-radius:100px;border:1.5px solid var(--grey-200);background:transparent;font-size:.82rem;font-weight:600;color:var(--grey-500);cursor:pointer;transition:all .15s;}
+.vol-tab.active{background:var(--primary);color:#fff;border-color:var(--primary);}
+.vol-tab:not(.active):hover{background:var(--grey-50);color:var(--grey-700);}
+
+/* Agent insight stat cards */
+.vol-agent-card{background:var(--white);border-radius:14px;border:1px solid var(--grey-100);box-shadow:0 1px 4px rgba(0,0,0,.04);padding:1.1rem 1.15rem;}
+.vol-agent-card .vac-name{font-weight:800;font-size:.88rem;color:var(--grey-900);margin-bottom:.7rem;display:flex;align-items:center;gap:.5rem;}
+.vol-agent-card .vac-avatar{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.68rem;font-weight:800;color:#fff;flex-shrink:0;}
+.vol-agent-card .vac-big{font-size:1.7rem;font-weight:900;letter-spacing:-.03em;color:var(--grey-900);line-height:1;}
+.vol-agent-card .vac-label{font-size:.7rem;color:var(--grey-400);font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-bottom:.15rem;}
+.vol-agent-card .vac-row{display:flex;gap:1.2rem;margin-top:.8rem;flex-wrap:wrap;}
+.vol-agent-card .vac-stat{display:flex;flex-direction:column;}
+.vol-agent-card .vac-stat-val{font-size:.92rem;font-weight:800;color:var(--grey-800);}
+.vol-agent-card .vac-stat-lbl{font-size:.66rem;color:var(--grey-400);font-weight:600;text-transform:uppercase;letter-spacing:.04em;}
+.vol-agent-card .vac-bar-wrap{height:5px;background:var(--grey-100);border-radius:10px;margin-top:.85rem;overflow:hidden;}
+.vol-agent-card .vac-bar-fill{height:100%;border-radius:10px;transition:width .5s ease;}
+.vol-agent-card .vac-change{font-size:.75rem;font-weight:700;margin-top:.55rem;}
+.vol-agent-card .vac-streak{font-size:.72rem;color:var(--grey-400);margin-top:.3rem;}
+
+/* Heatmap */
+.vol-heatmap-wrap{overflow-x:auto;}
+.vol-heatmap-grid{display:grid;gap:4px;}
+.vol-hm-cell{border-radius:5px;height:34px;display:flex;align-items:center;justify-content:center;font-size:.72rem;font-weight:700;transition:opacity .15s;cursor:default;}
+.vol-hm-cell:hover{opacity:.8;}
+.vol-hm-header{font-size:.66rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--grey-400);display:flex;align-items:center;justify-content:center;height:34px;}
+
+/* Donut canvas wrapper */
+.vol-donut-item{display:flex;flex-direction:column;align-items:center;gap:.4rem;}
+.vol-donut-label{font-size:.75rem;font-weight:700;color:var(--grey-600);}
+
+/* MoM table */
+.vol-mom-tbl{width:100%;border-collapse:collapse;font-size:.84rem;}
+.vol-mom-tbl th{padding:.5rem .75rem;text-align:left;font-size:.66rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--grey-400);border-bottom:1.5px solid var(--grey-100);}
+.vol-mom-tbl td{padding:.55rem .75rem;border-bottom:1px solid var(--grey-50);font-weight:700;color:var(--grey-800);}
+.vol-mom-tbl tr:last-child td{border-bottom:none;}
+.vol-mom-tbl .mom-change{font-size:.74rem;font-weight:700;padding:.2rem .45rem;border-radius:100px;}
+.vol-mom-change-up{background:#d1fae5;color:#065f46;}
+.vol-mom-change-dn{background:#fee2e2;color:#991b1b;}
+.vol-mom-change-neu{background:var(--grey-100);color:var(--grey-500);}
+
 /* Per-week volume card with collapsible daily grid */
 .vweek-card{background:var(--white);border-radius:14px;box-shadow:0 1px 2px rgba(0,0,0,.04),0 1px 8px rgba(0,0,0,.03);margin-bottom:.85rem;overflow:hidden;border:1px solid var(--grey-100);transition:box-shadow .15s;}
 .vweek-card:hover{box-shadow:0 2px 4px rgba(0,0,0,.05),0 4px 14px rgba(0,0,0,.05);}
@@ -683,12 +725,52 @@ details.card>summary::-webkit-details-marker{display:none;}
           <button class="btn btn-green btn-sm" id="btn-vol-addweek">+ Add Week</button>
         </div>
       </div>
-      <div id="volume-weeks-wrap"></div>
+      <!-- Volume view tabs -->
+      <div class="vol-tabs" id="vol-tabs">
+        <button class="vol-tab active" data-voltab="data">📋 Data</button>
+        <button class="vol-tab" data-voltab="insights">📈 Insights</button>
+      </div>
 
-      <!-- Monthly Totals comparison table -->
-      <div class="card" id="volume-monthly-totals-card" style="display:none;margin-top:1.25rem">
-        <div class="card-title">📊 Monthly Totals <span style="font-weight:400;color:var(--grey-400);font-size:.78rem;margin-left:.4rem">tickets handled per agent, compared across months</span></div>
-        <div class="tbl-wrap"><table id="atbl-monthly-totals" class="atbl"></table></div>
+      <!-- DATA TAB -->
+      <div id="vol-pane-data">
+        <div id="volume-weeks-wrap"></div>
+        <!-- Monthly Totals comparison table -->
+        <div class="card" id="volume-monthly-totals-card" style="display:none;margin-top:1.25rem">
+          <div class="card-title">📊 Monthly Totals <span style="font-weight:400;color:var(--grey-400);font-size:.78rem;margin-left:.4rem">tickets handled per agent, compared across months</span></div>
+          <div class="tbl-wrap"><table id="atbl-monthly-totals" class="atbl"></table></div>
+        </div>
+      </div>
+
+      <!-- INSIGHTS TAB -->
+      <div id="vol-pane-insights" style="display:none">
+        <!-- Agent stat cards row -->
+        <div id="vol-agent-cards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:.85rem;margin-bottom:1.5rem"></div>
+        <!-- Charts row: bar + line -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.5rem" id="vol-charts-row">
+          <div class="card" style="padding:1.25rem">
+            <div class="card-title" style="margin-bottom:1rem">📊 Tickets per Agent per Week</div>
+            <canvas id="vol-bar-canvas" height="220"></canvas>
+          </div>
+          <div class="card" style="padding:1.25rem">
+            <div class="card-title" style="margin-bottom:1rem">📈 Trend Across Weeks</div>
+            <canvas id="vol-line-canvas" height="220"></canvas>
+          </div>
+        </div>
+        <!-- Heatmap -->
+        <div class="card" style="padding:1.25rem;margin-bottom:1.5rem">
+          <div class="card-title" style="margin-bottom:1rem">🌡️ Daily Heatmap <span style="font-weight:400;color:var(--grey-400);font-size:.78rem">— darker = higher volume</span></div>
+          <div id="vol-heatmap"></div>
+        </div>
+        <!-- Team share donuts row -->
+        <div class="card" style="padding:1.25rem;margin-bottom:1.5rem">
+          <div class="card-title" style="margin-bottom:.75rem">🍩 Team Share per Week</div>
+          <div id="vol-donuts" style="display:flex;flex-wrap:wrap;gap:1.5rem;align-items:flex-start"></div>
+        </div>
+        <!-- Month-over-month comparison -->
+        <div class="card" id="vol-mom-card" style="padding:1.25rem">
+          <div class="card-title" style="margin-bottom:1rem">📅 Month-over-Month</div>
+          <div id="vol-mom"></div>
+        </div>
       </div>
 
       <!-- ═══ SECTION 2: RATING UPLOADS ═══ -->
@@ -2265,6 +2347,368 @@ function renderMonthlyTotalsTable(){
   agents.forEach(a=>{html+=`<td>${grandTotals[a]}</td>`;});
   html+=`<td>${grandAll}</td></tr></tbody>`;
   tbl.innerHTML=html;
+}
+
+/* ═══════════════════════════════════════════
+   VOLUME INSIGHTS (tab system + all charts)
+═══════════════════════════════════════════ */
+const AGENT_COLORS=['#e5534b','#7c6af7','#1a7a6a','#e8a400','#0ea5e9','#ec4899'];
+
+function initVolTabs(){
+  document.querySelectorAll('.vol-tab').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const tab=btn.dataset.voltab;
+      document.querySelectorAll('.vol-tab').forEach(b=>b.classList.toggle('active',b.dataset.voltab===tab));
+      el('vol-pane-data').style.display=tab==='data'?'':'none';
+      el('vol-pane-insights').style.display=tab==='insights'?'':'none';
+      if(tab==='insights') renderInsights();
+    });
+  });
+}
+
+function getWeekTotalsPerAgent(){
+  // Returns [{weekId, label, agents:{name:total}, grand}] sorted chronologically
+  const agents=getVolumeAgents();
+  const allWeekIds=[];
+  volumeMonths.forEach(mk=>(volumeWeeksByMonth[mk]||[]).forEach(id=>allWeekIds.push(id)));
+  return allWeekIds.map(weekId=>{
+    const wd=volumeData[weekId]||{};
+    const row={weekId,label:volumeWeekMeta[weekId]?.label||weekId,agents:{},grand:0};
+    agents.forEach(a=>{
+      let t=0;
+      VOL_DAYS.forEach((_,di)=>t+=(wd[di]?.[a]||0));
+      row.agents[a]=t;row.grand+=t;
+    });
+    return row;
+  });
+}
+
+function renderInsights(){
+  const agents=getVolumeAgents();
+  if(!agents.length||!volumeMonths.length){
+    el('vol-pane-insights').innerHTML='<div class="empty"><div class="empty-icon">📋</div>Add data first to see insights.</div>';
+    return;
+  }
+  const weeks=getWeekTotalsPerAgent();
+  if(!weeks.length) return;
+  renderAgentStatCards(agents,weeks);
+  renderBarChart(agents,weeks);
+  renderLineChart(agents,weeks);
+  renderHeatmap(agents,weeks);
+  renderDonuts(agents,weeks);
+  renderMoM(agents);
+}
+
+function renderAgentStatCards(agents,weeks){
+  const wrap=el('vol-agent-cards');
+  if(!wrap) return;
+  const allTotals=agents.map(a=>weeks.reduce((s,w)=>s+w.agents[a],0));
+  const maxTotal=Math.max(...allTotals,1);
+
+  wrap.innerHTML=agents.map((a,ai)=>{
+    const weeklyVals=weeks.map(w=>w.agents[a]);
+    const total=weeklyVals.reduce((s,v)=>s+v,0);
+    const avg=weeks.length?Math.round(total/weeks.length):0;
+    const best=Math.max(...weeklyVals,0);
+    const worst=Math.min(...weeklyVals.filter(v=>v>0),0)||0;
+    const lastTwo=weeklyVals.slice(-2);
+    const pctChange=lastTwo.length===2&&lastTwo[0]>0?Math.round(((lastTwo[1]-lastTwo[0])/lastTwo[0])*100):null;
+    // Streak: consecutive weeks as top agent
+    let streak=0;
+    for(let i=weeks.length-1;i>=0;i--){
+      const w=weeks[i];const topA=agents.reduce((best,b)=>w.agents[b]>w.agents[best]?b:best,agents[0]);
+      if(topA===a) streak++; else break;
+    }
+    const color=AGENT_COLORS[ai%AGENT_COLORS.length];
+    const initials=a.split(' ').map(p=>p[0]).join('').slice(0,2).toUpperCase();
+    const share=maxTotal>0?Math.round((total/maxTotal)*100):0;
+    const changeHtml=pctChange!=null?`<span class="vac-change" style="color:${pctChange>=0?'#065f46':'#991b1b'}">${pctChange>=0?'▲':'▼'} ${Math.abs(pctChange)}% vs last week</span>`:'';
+    const streakHtml=streak>=2?`<div class="vac-streak">🔥 #1 for ${streak} weeks straight</div>`:'';
+    return `<div class="vol-agent-card">
+      <div class="vac-name"><span class="vac-avatar" style="background:${color}">${initials}</span>${a.split(' ')[0]}</div>
+      <div class="vac-label">Total tickets</div>
+      <div class="vac-big">${total.toLocaleString()}</div>
+      <div class="vac-row">
+        <div class="vac-stat"><span class="vac-stat-val">${avg}</span><span class="vac-stat-lbl">Avg/wk</span></div>
+        <div class="vac-stat"><span class="vac-stat-val" style="color:#065f46">${best}</span><span class="vac-stat-lbl">Best</span></div>
+        ${worst>0?`<div class="vac-stat"><span class="vac-stat-val" style="color:#991b1b">${worst}</span><span class="vac-stat-lbl">Worst</span></div>`:''}
+      </div>
+      ${changeHtml}${streakHtml}
+      <div class="vac-bar-wrap"><div class="vac-bar-fill" style="width:${share}%;background:${color}"></div></div>
+    </div>`;
+  }).join('');
+}
+
+function drawBarChart(canvas,agents,weeks){
+  const ctx=canvas.getContext('2d');
+  const W=canvas.offsetWidth||canvas.parentElement.offsetWidth-40||500;
+  const H=220;
+  canvas.width=W*2;canvas.height=H*2;canvas.style.width=W+'px';canvas.style.height=H+'px';
+  ctx.scale(2,2);
+  const pad={l:40,r:10,t:10,b:55};
+  const chartW=W-pad.l-pad.r;const chartH=H-pad.t-pad.b;
+  ctx.clearRect(0,0,W,H);
+  const isDark=document.body.getAttribute('data-theme')==='dark';
+  const textCol=isDark?'#94a3b8':'#64748b';const gridCol=isDark?'rgba(255,255,255,.07)':'rgba(0,0,0,.06)';
+
+  if(!weeks.length){ctx.fillStyle=textCol;ctx.font='13px system-ui';ctx.fillText('No data',pad.l+chartW/2,pad.t+chartH/2);return;}
+
+  const n=weeks.length;const nA=agents.length;
+  const groupW=chartW/n;const barW=Math.min((groupW*.75)/nA,28);const gap=(groupW-.75*groupW)/2;
+  const maxVal=Math.max(...weeks.flatMap(w=>agents.map(a=>w.agents[a])),1);
+
+  // Grid lines
+  [0,.25,.5,.75,1].forEach(f=>{
+    const y=pad.t+chartH*(1-f);
+    ctx.strokeStyle=gridCol;ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(pad.l+chartW,y);ctx.stroke();
+    if(f>0){ctx.fillStyle=textCol;ctx.font='9px system-ui';ctx.textAlign='right';ctx.fillText(Math.round(maxVal*f),pad.l-4,y+3);}
+  });
+
+  weeks.forEach((w,wi)=>{
+    const gx=pad.l+wi*groupW+gap;
+    agents.forEach((a,ai)=>{
+      const v=w.agents[a];
+      const bh=(v/maxVal)*chartH;
+      const bx=gx+ai*(barW+1);
+      const by=pad.t+chartH-bh;
+      ctx.fillStyle=AGENT_COLORS[ai%AGENT_COLORS.length];
+      ctx.beginPath();
+      const r=Math.min(3,barW/2);
+      ctx.moveTo(bx+r,by);ctx.lineTo(bx+barW-r,by);ctx.quadraticCurveTo(bx+barW,by,bx+barW,by+r);
+      ctx.lineTo(bx+barW,by+bh);ctx.lineTo(bx,by+bh);ctx.lineTo(bx,by+r);ctx.quadraticCurveTo(bx,by,bx+r,by);
+      ctx.fill();
+    });
+    // X label
+    ctx.fillStyle=textCol;ctx.font='8px system-ui';ctx.textAlign='center';
+    const lbl=w.label.length>8?w.label.substring(0,8)+'…':w.label;
+    ctx.fillText(lbl,pad.l+wi*groupW+groupW/2,pad.t+chartH+12);
+  });
+
+  // Legend
+  agents.forEach((a,ai)=>{
+    const lx=pad.l+ai*(chartW/nA);
+    ctx.fillStyle=AGENT_COLORS[ai%AGENT_COLORS.length];
+    ctx.fillRect(lx,pad.t+chartH+22,8,8);
+    ctx.fillStyle=textCol;ctx.font='8.5px system-ui';ctx.textAlign='left';
+    ctx.fillText(a.split(' ')[0],lx+11,pad.t+chartH+29);
+  });
+}
+
+function drawLineChart(canvas,agents,weeks){
+  const ctx=canvas.getContext('2d');
+  const W=canvas.offsetWidth||canvas.parentElement.offsetWidth-40||500;
+  const H=220;
+  canvas.width=W*2;canvas.height=H*2;canvas.style.width=W+'px';canvas.style.height=H+'px';
+  ctx.scale(2,2);
+  const pad={l:40,r:10,t:10,b:55};
+  const chartW=W-pad.l-pad.r;const chartH=H-pad.t-pad.b;
+  ctx.clearRect(0,0,W,H);
+  const isDark=document.body.getAttribute('data-theme')==='dark';
+  const textCol=isDark?'#94a3b8':'#64748b';const gridCol=isDark?'rgba(255,255,255,.07)':'rgba(0,0,0,.06)';
+
+  if(weeks.length<2){ctx.fillStyle=textCol;ctx.font='12px system-ui';ctx.textAlign='center';ctx.fillText('Need ≥ 2 weeks for trend',pad.l+chartW/2,pad.t+chartH/2);return;}
+
+  const maxVal=Math.max(...weeks.flatMap(w=>agents.map(a=>w.agents[a])),1);
+  const n=weeks.length;
+
+  [0,.25,.5,.75,1].forEach(f=>{
+    const y=pad.t+chartH*(1-f);
+    ctx.strokeStyle=gridCol;ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(pad.l+chartW,y);ctx.stroke();
+    if(f>0){ctx.fillStyle=textCol;ctx.font='9px system-ui';ctx.textAlign='right';ctx.fillText(Math.round(maxVal*f),pad.l-4,y+3);}
+  });
+
+  agents.forEach((a,ai)=>{
+    const color=AGENT_COLORS[ai%AGENT_COLORS.length];
+    ctx.strokeStyle=color;ctx.lineWidth=2.5;ctx.beginPath();
+    weeks.forEach((w,wi)=>{
+      const x=pad.l+(wi/(n-1))*chartW;
+      const y=pad.t+chartH-(w.agents[a]/maxVal)*chartH;
+      wi===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+    });
+    ctx.stroke();
+    // Dots
+    weeks.forEach((w,wi)=>{
+      const x=pad.l+(wi/(n-1))*chartW;
+      const y=pad.t+chartH-(w.agents[a]/maxVal)*chartH;
+      ctx.fillStyle=color;ctx.beginPath();ctx.arc(x,y,3.5,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(x,y,1.5,0,Math.PI*2);ctx.fill();
+    });
+  });
+
+  // X labels
+  weeks.forEach((w,wi)=>{
+    const x=pad.l+(wi/(n-1||1))*chartW;
+    ctx.fillStyle=textCol;ctx.font='8px system-ui';ctx.textAlign='center';
+    const lbl=w.label.length>8?w.label.substring(0,8)+'…':w.label;
+    ctx.fillText(lbl,x,pad.t+chartH+12);
+  });
+
+  // Legend
+  const nA=agents.length;
+  agents.forEach((a,ai)=>{
+    const lx=pad.l+ai*(chartW/nA);
+    ctx.fillStyle=AGENT_COLORS[ai%AGENT_COLORS.length];
+    ctx.fillRect(lx,pad.t+chartH+22,8,8);
+    ctx.fillStyle=textCol;ctx.font='8.5px system-ui';ctx.textAlign='left';
+    ctx.fillText(a.split(' ')[0],lx+11,pad.t+chartH+29);
+  });
+}
+
+function renderBarChart(agents,weeks){
+  const canvas=el('vol-bar-canvas');if(!canvas) return;
+  setTimeout(()=>drawBarChart(canvas,agents,weeks),50);
+}
+function renderLineChart(agents,weeks){
+  const canvas=el('vol-line-canvas');if(!canvas) return;
+  setTimeout(()=>drawLineChart(canvas,agents,weeks),50);
+}
+
+function renderHeatmap(agents,weeks){
+  const wrap=el('vol-heatmap');if(!wrap) return;
+  if(!weeks.length){wrap.innerHTML='<div class="empty" style="padding:1rem">No data yet.</div>';return;}
+
+  // Find global max for color scaling
+  let globalMax=0;
+  weeks.forEach(w=>agents.forEach(a=>{if(w.agents[a]>globalMax)globalMax=w.agents[a];}));
+  if(globalMax===0){wrap.innerHTML='<div class="empty" style="padding:1rem">No data yet.</div>';return;}
+
+  const nA=agents.length;
+  // Grid: cols = weeks, rows = agents + header row
+  // Extra first col for agent name
+  const totalCols=1+weeks.length;
+  const totalRows=1+nA; // header + agent rows
+
+  let gridStyle=`display:grid;grid-template-columns:120px repeat(${weeks.length},1fr);gap:4px;min-width:${120+weeks.length*80}px;`;
+  let cells='';
+
+  // Header row
+  cells+=`<div class="vol-hm-header"></div>`;
+  weeks.forEach(w=>{
+    const lbl=w.label.length>10?w.label.substring(0,10)+'…':w.label;
+    cells+=`<div class="vol-hm-header" title="${w.label}">${lbl}</div>`;
+  });
+
+  // Agent rows
+  agents.forEach((a,ai)=>{
+    const color=AGENT_COLORS[ai%AGENT_COLORS.length];
+    const initials=a.split(' ').map(p=>p[0]).join('').slice(0,2).toUpperCase();
+    cells+=`<div class="vol-hm-header" style="justify-content:flex-start;padding-left:4px;gap:6px">
+      <span style="width:22px;height:22px;border-radius:50%;background:${color};display:inline-flex;align-items:center;justify-content:center;font-size:.6rem;font-weight:800;color:#fff;flex-shrink:0">${initials}</span>
+      <span style="font-size:.72rem;font-weight:700;color:var(--grey-700);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${a.split(' ')[0]}</span>
+    </div>`;
+    weeks.forEach(w=>{
+      const v=w.agents[a]||0;
+      const intensity=globalMax>0?v/globalMax:0;
+      // Color: low=light teal, high=dark teal, 0=very light grey
+      const alpha=v===0?0:.15+intensity*.85;
+      const bg=v===0?'var(--grey-50)':`rgba(26,122,106,${alpha})`;
+      const textColor=intensity>.5?'#fff':intensity>.2?'#065f46':'var(--grey-400)';
+      cells+=`<div class="vol-hm-cell" style="background:${bg};color:${textColor}" title="${a}: ${v} tickets in ${w.label}">${v||''}</div>`;
+    });
+  });
+
+  wrap.innerHTML=`<div class="vol-heatmap-wrap"><div style="${gridStyle}">${cells}</div></div>`;
+}
+
+function drawDonut(canvas,agents,weekData,size){
+  const ctx=canvas.getContext('2d');
+  canvas.width=size*2;canvas.height=size*2;canvas.style.width=size+'px';canvas.style.height=size+'px';
+  ctx.scale(2,2);
+  const cx=size/2,cy=size/2,r=size/2-6,ir=r*.55;
+  const totals=agents.map(a=>weekData.agents[a]||0);
+  const grand=totals.reduce((s,v)=>s+v,0)||1;
+  let angle=-Math.PI/2;
+  totals.forEach((v,i)=>{
+    const sweep=(v/grand)*Math.PI*2;
+    ctx.beginPath();ctx.moveTo(cx,cy);
+    ctx.arc(cx,cy,r,angle,angle+sweep);ctx.closePath();
+    ctx.fillStyle=AGENT_COLORS[i%AGENT_COLORS.length];ctx.fill();
+    angle+=sweep;
+  });
+  // Inner circle (cutout)
+  ctx.beginPath();ctx.arc(cx,cy,ir,0,Math.PI*2);
+  ctx.fillStyle=getComputedStyle(document.documentElement).getPropertyValue('--white')||'#fff';ctx.fill();
+  // Center text
+  ctx.fillStyle='#374151';ctx.font=`bold ${Math.round(size*.13)}px system-ui`;ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.fillText(grand.toLocaleString(),cx,cy);
+}
+
+function renderDonuts(agents,weeks){
+  const wrap=el('vol-donuts');if(!wrap) return;
+  wrap.innerHTML='';
+  const size=110;
+  weeks.forEach(w=>{
+    const item=document.createElement('div');
+    item.className='vol-donut-item';
+    const cv=document.createElement('canvas');
+    const lbl=document.createElement('div');
+    lbl.className='vol-donut-label';lbl.textContent=w.label;
+    item.appendChild(cv);item.appendChild(lbl);
+    wrap.appendChild(item);
+    setTimeout(()=>drawDonut(cv,agents,w,size),50);
+  });
+  // Legend
+  const legWrap=document.createElement('div');
+  legWrap.style.cssText='display:flex;flex-wrap:wrap;gap:.5rem .85rem;align-items:center;margin-left:auto;align-self:center;';
+  agents.forEach((a,i)=>{
+    const sp=document.createElement('span');
+    sp.style.cssText='display:flex;align-items:center;gap:.35rem;font-size:.75rem;font-weight:600;color:var(--grey-600)';
+    sp.innerHTML=`<span style="width:10px;height:10px;border-radius:50%;background:${AGENT_COLORS[i%AGENT_COLORS.length]};display:inline-block"></span>${a.split(' ')[0]}`;
+    legWrap.appendChild(sp);
+  });
+  wrap.appendChild(legWrap);
+}
+
+function renderMoM(agents){
+  const wrap=el('vol-mom');if(!wrap) return;
+  const card=el('vol-mom-card');
+  if(!volumeMonths.length){card.style.display='none';return;}
+  card.style.display='';
+
+  const sortedMonths=[...volumeMonths].sort();
+  if(sortedMonths.length<2){wrap.innerHTML='<div style="color:var(--grey-400);font-size:.85rem;padding:.5rem 0">Need at least 2 months of data for comparison.</div>';return;}
+
+  // Compute per-agent totals per month
+  const monthData={};
+  sortedMonths.forEach(mk=>{
+    monthData[mk]={};
+    agents.forEach(a=>{
+      let t=0;
+      (volumeWeeksByMonth[mk]||[]).forEach(wid=>{
+        const wd=volumeData[wid]||{};
+        VOL_DAYS.forEach((_,di)=>t+=(wd[di]?.[a]||0));
+      });
+      monthData[mk][a]=t;
+    });
+  });
+
+  let html='<table class="vol-mom-tbl"><thead><tr><th>Agent</th>';
+  sortedMonths.forEach(mk=>html+=`<th>${monthLabel(mk)}</th>`);
+  html+='<th>Change</th></tr></thead><tbody>';
+
+  agents.forEach((a,ai)=>{
+    html+=`<tr><td style="display:flex;align-items:center;gap:.5rem;font-weight:700"><span style="width:8px;height:8px;border-radius:50%;background:${AGENT_COLORS[ai%AGENT_COLORS.length]};display:inline-block"></span>${a}</td>`;
+    sortedMonths.forEach(mk=>html+=`<td>${monthData[mk][a]||'—'}</td>`);
+    const first=monthData[sortedMonths[0]][a];
+    const last=monthData[sortedMonths[sortedMonths.length-1]][a];
+    const chg=first>0?Math.round(((last-first)/first)*100):null;
+    const cls=chg==null?'vol-mom-change-neu':chg>0?'vol-mom-change-up':'vol-mom-change-dn';
+    const lbl=chg==null?'—':chg>0?`▲ ${chg}%`:`▼ ${Math.abs(chg)}%`;
+    html+=`<td><span class="mom-change ${cls}">${lbl}</span></td></tr>`;
+  });
+
+  // Team totals row
+  html+=`<tr style="border-top:2px solid var(--grey-100)"><td style="font-weight:800">Team Total</td>`;
+  sortedMonths.forEach(mk=>{
+    const t=agents.reduce((s,a)=>s+(monthData[mk][a]||0),0);
+    html+=`<td style="font-weight:800">${t||'—'}</td>`;
+  });
+  const ft=agents.reduce((s,a)=>s+(monthData[sortedMonths[0]][a]||0),0);
+  const lt=agents.reduce((s,a)=>s+(monthData[sortedMonths[sortedMonths.length-1]][a]||0),0);
+  const tc=ft>0?Math.round(((lt-ft)/ft)*100):null;
+  const tcls=tc==null?'vol-mom-change-neu':tc>0?'vol-mom-change-up':'vol-mom-change-dn';
+  html+=`<td><span class="mom-change ${tcls}">${tc==null?'—':tc>0?`▲ ${tc}%`:`▼ ${Math.abs(tc)}%`}</span></td></tr></tbody></table>`;
+  wrap.innerHTML=html;
 }
 
 function parseAgentBlockSheet(sheet){
@@ -4114,6 +4558,7 @@ wire('btn-export',       exportExcel);
 wire('btn-export-img',   exportScheduleImage);
 
 // Analytics
+initVolTabs();
 wire('btn-vol-addweek',     ()=>addVolumeWeek());
 wire('btn-vol-addmonth',    addVolumeMonth);
 wire('btn-analytics-pick',  ()=>el('analytics-file-input').click());
