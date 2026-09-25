@@ -745,15 +745,15 @@ details.card>summary::-webkit-details-marker{display:none;}
       <div id="vol-pane-insights" style="display:none">
         <!-- Agent stat cards row -->
         <div id="vol-agent-cards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:.85rem;margin-bottom:1.5rem"></div>
-        <!-- Charts row: bar + line -->
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.5rem" id="vol-charts-row">
+        <!-- Charts: stacked for full width -->
+        <div style="display:flex;flex-direction:column;gap:1rem;margin-bottom:1.5rem" id="vol-charts-row">
           <div class="card" style="padding:1.25rem">
-            <div class="card-title" style="margin-bottom:1rem">📊 Tickets per Agent per Week</div>
-            <canvas id="vol-bar-canvas" height="220"></canvas>
+            <div class="card-title" style="margin-bottom:.75rem">📊 Tickets per Agent per Week <span style="font-size:.72rem;font-weight:400;color:var(--grey-400)">— hover for details · scroll right if many weeks</span></div>
+            <div id="vol-bar-wrap" style="width:100%;min-height:260px"></div>
           </div>
           <div class="card" style="padding:1.25rem">
-            <div class="card-title" style="margin-bottom:1rem">📈 Trend Across Weeks</div>
-            <canvas id="vol-line-canvas" height="220"></canvas>
+            <div class="card-title" style="margin-bottom:.75rem">📈 Trend Across Weeks <span style="font-size:.72rem;font-weight:400;color:var(--grey-400)">— hover a dot to see agent + value</span></div>
+            <div id="vol-line-wrap" style="width:100%;min-height:260px"></div>
           </div>
         </div>
         <!-- Heatmap -->
@@ -2439,128 +2439,202 @@ function renderAgentStatCards(agents,weeks){
   }).join('');
 }
 
-function drawBarChart(canvas,agents,weeks){
-  const ctx=canvas.getContext('2d');
-  const W=canvas.offsetWidth||canvas.parentElement.offsetWidth-40||500;
-  const H=220;
-  canvas.width=W*2;canvas.height=H*2;canvas.style.width=W+'px';canvas.style.height=H+'px';
-  ctx.scale(2,2);
-  const pad={l:40,r:10,t:10,b:55};
-  const chartW=W-pad.l-pad.r;const chartH=H-pad.t-pad.b;
-  ctx.clearRect(0,0,W,H);
-  const isDark=document.body.getAttribute('data-theme')==='dark';
-  const textCol=isDark?'#94a3b8':'#64748b';const gridCol=isDark?'rgba(255,255,255,.07)':'rgba(0,0,0,.06)';
-
-  if(!weeks.length){ctx.fillStyle=textCol;ctx.font='13px system-ui';ctx.fillText('No data',pad.l+chartW/2,pad.t+chartH/2);return;}
-
-  const n=weeks.length;const nA=agents.length;
-  const groupW=chartW/n;const barW=Math.min((groupW*.75)/nA,28);const gap=(groupW-.75*groupW)/2;
-  const maxVal=Math.max(...weeks.flatMap(w=>agents.map(a=>w.agents[a])),1);
-
-  // Grid lines
-  [0,.25,.5,.75,1].forEach(f=>{
-    const y=pad.t+chartH*(1-f);
-    ctx.strokeStyle=gridCol;ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(pad.l+chartW,y);ctx.stroke();
-    if(f>0){ctx.fillStyle=textCol;ctx.font='9px system-ui';ctx.textAlign='right';ctx.fillText(Math.round(maxVal*f),pad.l-4,y+3);}
-  });
-
-  weeks.forEach((w,wi)=>{
-    const gx=pad.l+wi*groupW+gap;
-    agents.forEach((a,ai)=>{
-      const v=w.agents[a];
-      const bh=(v/maxVal)*chartH;
-      const bx=gx+ai*(barW+1);
-      const by=pad.t+chartH-bh;
-      ctx.fillStyle=AGENT_COLORS[ai%AGENT_COLORS.length];
-      ctx.beginPath();
-      const r=Math.min(3,barW/2);
-      ctx.moveTo(bx+r,by);ctx.lineTo(bx+barW-r,by);ctx.quadraticCurveTo(bx+barW,by,bx+barW,by+r);
-      ctx.lineTo(bx+barW,by+bh);ctx.lineTo(bx,by+bh);ctx.lineTo(bx,by+r);ctx.quadraticCurveTo(bx,by,bx+r,by);
-      ctx.fill();
-    });
-    // X label
-    ctx.fillStyle=textCol;ctx.font='8px system-ui';ctx.textAlign='center';
-    const lbl=w.label.length>8?w.label.substring(0,8)+'…':w.label;
-    ctx.fillText(lbl,pad.l+wi*groupW+groupW/2,pad.t+chartH+12);
-  });
-
-  // Legend
-  agents.forEach((a,ai)=>{
-    const lx=pad.l+ai*(chartW/nA);
-    ctx.fillStyle=AGENT_COLORS[ai%AGENT_COLORS.length];
-    ctx.fillRect(lx,pad.t+chartH+22,8,8);
-    ctx.fillStyle=textCol;ctx.font='8.5px system-ui';ctx.textAlign='left';
-    ctx.fillText(a.split(' ')[0],lx+11,pad.t+chartH+29);
-  });
+/* ── Shared chart tooltip div ── */
+let _chartTip=null;
+function getChartTip(){
+  if(!_chartTip){
+    _chartTip=document.createElement('div');
+    _chartTip.id='chart-tooltip';
+    _chartTip.style.cssText='position:fixed;z-index:9999;pointer-events:none;background:rgba(15,23,42,.92);color:#f1f5f9;padding:.45rem .75rem;border-radius:8px;font-size:.78rem;font-weight:600;white-space:pre;line-height:1.55;box-shadow:0 4px 16px rgba(0,0,0,.25);display:none;transition:opacity .1s';
+    document.body.appendChild(_chartTip);
+  }
+  return _chartTip;
 }
+function showTip(html,x,y){
+  const t=getChartTip();t.innerHTML=html;t.style.display='block';
+  const vw=window.innerWidth,vh=window.innerHeight;
+  let lx=x+14,ly=y-10;
+  if(lx+160>vw) lx=x-170;
+  if(ly+80>vh) ly=y-90;
+  t.style.left=lx+'px';t.style.top=ly+'px';
+}
+function hideTip(){const t=getChartTip();t.style.display='none';}
 
-function drawLineChart(canvas,agents,weeks){
-  const ctx=canvas.getContext('2d');
-  const W=canvas.offsetWidth||canvas.parentElement.offsetWidth-40||500;
-  const H=220;
-  canvas.width=W*2;canvas.height=H*2;canvas.style.width=W+'px';canvas.style.height=H+'px';
-  ctx.scale(2,2);
-  const pad={l:40,r:10,t:10,b:55};
-  const chartW=W-pad.l-pad.r;const chartH=H-pad.t-pad.b;
-  ctx.clearRect(0,0,W,H);
+function buildChart(containerId,agents,weeks,type){
+  const container=el(containerId);if(!container) return;
+  container.innerHTML='';
+
   const isDark=document.body.getAttribute('data-theme')==='dark';
-  const textCol=isDark?'#94a3b8':'#64748b';const gridCol=isDark?'rgba(255,255,255,.07)':'rgba(0,0,0,.06)';
+  const textCol=isDark?'#94a3b8':'#64748b';
+  const gridCol=isDark?'rgba(255,255,255,.07)':'rgba(0,0,0,.08)';
+  const bgCard=isDark?'#1e293b':'#ffffff';
 
-  if(weeks.length<2){ctx.fillStyle=textCol;ctx.font='12px system-ui';ctx.textAlign='center';ctx.fillText('Need ≥ 2 weeks for trend',pad.l+chartW/2,pad.t+chartH/2);return;}
-
-  const maxVal=Math.max(...weeks.flatMap(w=>agents.map(a=>w.agents[a])),1);
+  const pad={l:48,r:16,t:16,b:72};
+  const H=260;
+  const nA=agents.length;
   const n=weeks.length;
 
-  [0,.25,.5,.75,1].forEach(f=>{
+  // For bar: each group needs enough px — min 14px per bar
+  const minBarW=14, barGap=3, groupGap=18;
+  const groupW_bar=nA*minBarW+(nA-1)*barGap+groupGap;
+  const canvasW=type==='bar'
+    ? Math.max(pad.l+pad.r+n*groupW_bar, container.offsetWidth||600)
+    : container.offsetWidth||600;
+  const chartW=canvasW-pad.l-pad.r;
+  const chartH=H-pad.t-pad.b;
+
+  // Scrollable wrapper for bar
+  const scroll=document.createElement('div');
+  scroll.style.cssText='overflow-x:auto;overflow-y:visible;width:100%;position:relative;';
+  container.appendChild(scroll);
+
+  const canvas=document.createElement('canvas');
+  const dpr=window.devicePixelRatio||1;
+  canvas.width=canvasW*dpr; canvas.height=H*dpr;
+  canvas.style.width=canvasW+'px'; canvas.style.height=H+'px';
+  canvas.style.display='block';
+  scroll.appendChild(canvas);
+
+  const ctx=canvas.getContext('2d');
+  ctx.scale(dpr,dpr);
+
+  const maxVal=Math.max(...weeks.flatMap(w=>agents.map(a=>w.agents[a]||0)),1);
+
+  function ptX(wi){ return pad.l+(wi/(Math.max(n-1,1)))*chartW; }
+  function ptY(v){ return pad.t+chartH-(v/maxVal)*chartH; }
+
+  // ── Draw grid ──
+  const steps=5;
+  for(let i=0;i<=steps;i++){
+    const f=i/steps;
     const y=pad.t+chartH*(1-f);
-    ctx.strokeStyle=gridCol;ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(pad.l+chartW,y);ctx.stroke();
-    if(f>0){ctx.fillStyle=textCol;ctx.font='9px system-ui';ctx.textAlign='right';ctx.fillText(Math.round(maxVal*f),pad.l-4,y+3);}
-  });
+    ctx.strokeStyle=gridCol;ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(pad.l+chartW,y);ctx.stroke();
+    ctx.fillStyle=textCol;ctx.font=`${10*dpr/dpr}px system-ui`;ctx.textAlign='right';ctx.textBaseline='middle';
+    ctx.fillText(Math.round(maxVal*f).toLocaleString(),pad.l-6,y);
+  }
 
-  agents.forEach((a,ai)=>{
-    const color=AGENT_COLORS[ai%AGENT_COLORS.length];
-    ctx.strokeStyle=color;ctx.lineWidth=2.5;ctx.beginPath();
+  // ── Axis line ──
+  ctx.strokeStyle=gridCol;ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.moveTo(pad.l,pad.t);ctx.lineTo(pad.l,pad.t+chartH);ctx.lineTo(pad.l+chartW,pad.t+chartH);ctx.stroke();
+
+  // ── Store hit-areas for interaction ──
+  const hitAreas=[]; // {x1,y1,x2,y2,agent,week,value,color}
+
+  if(type==='bar'){
+    const actualBarW=Math.max(minBarW, (chartW/n - groupGap - (nA-1)*barGap)/nA);
     weeks.forEach((w,wi)=>{
-      const x=pad.l+(wi/(n-1))*chartW;
-      const y=pad.t+chartH-(w.agents[a]/maxVal)*chartH;
-      wi===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+      const groupX=pad.l + wi*(chartW/n) + groupGap/2;
+      agents.forEach((a,ai)=>{
+        const v=w.agents[a]||0;
+        const bh=Math.max((v/maxVal)*chartH,0);
+        const bx=groupX+ai*(actualBarW+barGap);
+        const by=pad.t+chartH-bh;
+        const color=AGENT_COLORS[ai%AGENT_COLORS.length];
+        // Rounded top
+        ctx.fillStyle=color;
+        ctx.beginPath();
+        const r=Math.min(4,actualBarW/2);
+        if(bh>r){
+          ctx.moveTo(bx+r,by);ctx.lineTo(bx+actualBarW-r,by);
+          ctx.quadraticCurveTo(bx+actualBarW,by,bx+actualBarW,by+r);
+          ctx.lineTo(bx+actualBarW,by+bh);ctx.lineTo(bx,by+bh);
+          ctx.lineTo(bx,by+r);ctx.quadraticCurveTo(bx,by,bx+r,by);
+        } else {
+          ctx.rect(bx,by,actualBarW,bh);
+        }
+        ctx.fill();
+        hitAreas.push({x1:bx,y1:by,x2:bx+actualBarW,y2:by+bh,agent:a,week:w.label,value:v,color,ai});
+      });
+      // X label
+      ctx.fillStyle=textCol;ctx.font='10px system-ui';ctx.textAlign='center';ctx.textBaseline='top';
+      const lbl=w.label.length>10?w.label.slice(0,10)+'…':w.label;
+      ctx.fillText(lbl, groupX+((nA*actualBarW+(nA-1)*barGap)/2), pad.t+chartH+6);
     });
-    ctx.stroke();
-    // Dots
+  }
+
+  if(type==='line'){
+    // Draw lines first
+    agents.forEach((a,ai)=>{
+      const color=AGENT_COLORS[ai%AGENT_COLORS.length];
+      ctx.strokeStyle=color;ctx.lineWidth=2.5;ctx.lineJoin='round';ctx.lineCap='round';
+      ctx.beginPath();
+      weeks.forEach((w,wi)=>{
+        const x=ptX(wi),y=ptY(w.agents[a]||0);
+        wi===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+      });
+      ctx.stroke();
+    });
+    // Draw dots on top + hit areas
+    agents.forEach((a,ai)=>{
+      const color=AGENT_COLORS[ai%AGENT_COLORS.length];
+      weeks.forEach((w,wi)=>{
+        const v=w.agents[a]||0;
+        const x=ptX(wi),y=ptY(v);
+        ctx.fillStyle=color;ctx.beginPath();ctx.arc(x,y,5,0,Math.PI*2);ctx.fill();
+        ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(x,y,2.5,0,Math.PI*2);ctx.fill();
+        hitAreas.push({x1:x-10,y1:y-10,x2:x+10,y2:y+10,agent:a,week:w.label,value:v,color,ai,cx:x,cy:y});
+      });
+    });
+    // X labels
     weeks.forEach((w,wi)=>{
-      const x=pad.l+(wi/(n-1))*chartW;
-      const y=pad.t+chartH-(w.agents[a]/maxVal)*chartH;
-      ctx.fillStyle=color;ctx.beginPath();ctx.arc(x,y,3.5,0,Math.PI*2);ctx.fill();
-      ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(x,y,1.5,0,Math.PI*2);ctx.fill();
+      const x=ptX(wi);
+      ctx.fillStyle=textCol;ctx.font='10px system-ui';ctx.textAlign='center';ctx.textBaseline='top';
+      const lbl=w.label.length>10?w.label.slice(0,10)+'…':w.label;
+      ctx.fillText(lbl,x,pad.t+chartH+6);
     });
-  });
+  }
 
-  // X labels
-  weeks.forEach((w,wi)=>{
-    const x=pad.l+(wi/(n-1||1))*chartW;
-    ctx.fillStyle=textCol;ctx.font='8px system-ui';ctx.textAlign='center';
-    const lbl=w.label.length>8?w.label.substring(0,8)+'…':w.label;
-    ctx.fillText(lbl,x,pad.t+chartH+12);
-  });
-
-  // Legend
-  const nA=agents.length;
+  // ── Legend (below chart) ──
+  const legY=pad.t+chartH+36;
+  const legColW=Math.min(chartW/nA, 120);
   agents.forEach((a,ai)=>{
-    const lx=pad.l+ai*(chartW/nA);
+    const lx=pad.l+ai*legColW;
     ctx.fillStyle=AGENT_COLORS[ai%AGENT_COLORS.length];
-    ctx.fillRect(lx,pad.t+chartH+22,8,8);
-    ctx.fillStyle=textCol;ctx.font='8.5px system-ui';ctx.textAlign='left';
-    ctx.fillText(a.split(' ')[0],lx+11,pad.t+chartH+29);
+    ctx.beginPath();ctx.arc(lx+5,legY+5,5,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle=textCol;ctx.font='10px system-ui';ctx.textAlign='left';ctx.textBaseline='middle';
+    const nm=a.split(' ')[0];
+    ctx.fillText(nm.length>10?nm.slice(0,10)+'…':nm,lx+14,legY+5);
   });
+
+  // ── Interaction ──
+  let hoveredArea=null;
+  function redrawHighlight(mx,my){
+    // Find hit area
+    let found=null;
+    for(const h of hitAreas){
+      if(mx>=h.x1&&mx<=h.x2&&my>=h.y1&&my<=h.y2){found=h;break;}
+    }
+    if(found===hoveredArea) return;
+    hoveredArea=found;
+    if(found){
+      canvas.style.cursor='crosshair';
+    } else {
+      canvas.style.cursor='default';
+      hideTip();
+    }
+  }
+
+  canvas.addEventListener('mousemove',e=>{
+    const rect=canvas.getBoundingClientRect();
+    const scaleX=canvasW/rect.width;
+    const mx=(e.clientX-rect.left)*scaleX;
+    const my=(e.clientY-rect.top)*(H/rect.height);
+    redrawHighlight(mx,my);
+    if(hoveredArea){
+      const h=hoveredArea;
+      const dot=`<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${h.color};margin-right:4px;vertical-align:middle"></span>`;
+      showTip(`${dot}<strong>${h.agent}</strong>\n${h.week}: <strong>${h.value.toLocaleString()}</strong> tickets`,e.clientX,e.clientY);
+    }
+  });
+  canvas.addEventListener('mouseleave',()=>{hideTip();hoveredArea=null;canvas.style.cursor='default';});
 }
 
 function renderBarChart(agents,weeks){
-  const canvas=el('vol-bar-canvas');if(!canvas) return;
-  setTimeout(()=>drawBarChart(canvas,agents,weeks),50);
+  setTimeout(()=>buildChart('vol-bar-wrap',agents,weeks,'bar'),60);
 }
 function renderLineChart(agents,weeks){
-  const canvas=el('vol-line-canvas');if(!canvas) return;
-  setTimeout(()=>drawLineChart(canvas,agents,weeks),50);
+  setTimeout(()=>buildChart('vol-line-wrap',agents,weeks,'line'),60);
 }
 
 function renderHeatmap(agents,weeks){
