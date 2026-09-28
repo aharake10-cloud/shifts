@@ -149,8 +149,8 @@ select option{background:var(--white);}
 .sidebar-scrim{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:49;}
 
 /* ─── MAIN ─── */
-.main{margin-left:240px;padding:2rem;min-height:100vh;}
-.page{display:none;}.page.active{display:block;}
+.main{margin-left:240px;padding:2rem;min-height:100vh;min-width:0;overflow-x:hidden;}
+.page{display:none;min-width:0;}.page.active{display:block;}
 .page-hdr{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:1.75rem;flex-wrap:wrap;gap:.75rem;}
 .page-title{font-size:1.5rem;font-weight:800;color:var(--grey-900);letter-spacing:-.3px;}
 .page-sub{font-size:.82rem;color:var(--grey-400);margin-top:2px;}
@@ -742,34 +742,34 @@ details.card>summary::-webkit-details-marker{display:none;}
       </div>
 
       <!-- INSIGHTS TAB -->
-      <div id="vol-pane-insights" style="display:none">
+      <div id="vol-pane-insights" style="display:none;min-width:0;overflow:hidden">
         <!-- Agent stat cards row -->
-        <div id="vol-agent-cards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:.85rem;margin-bottom:1.5rem"></div>
+        <div id="vol-agent-cards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:.85rem;margin-bottom:1.5rem"></div>
         <!-- Charts: stacked for full width -->
-        <div style="display:flex;flex-direction:column;gap:1rem;margin-bottom:1.5rem" id="vol-charts-row">
-          <div class="card" style="padding:1.25rem">
-            <div class="card-title" style="margin-bottom:.75rem">📊 Tickets per Agent per Week <span style="font-size:.72rem;font-weight:400;color:var(--grey-400)">— hover for details · scroll right if many weeks</span></div>
-            <div id="vol-bar-wrap" style="width:100%;min-height:260px"></div>
+        <div style="display:flex;flex-direction:column;gap:1rem;margin-bottom:1.5rem;min-width:0" id="vol-charts-row">
+          <div class="card" style="padding:1.25rem;min-width:0;overflow:hidden">
+            <div class="card-title" style="margin-bottom:.75rem">📊 Tickets per Agent per Week <span style="font-size:.72rem;font-weight:400;color:var(--grey-400)">— hover bars · scroll ➜ if many weeks</span></div>
+            <div id="vol-bar-wrap" style="width:100%;min-width:0"></div>
           </div>
-          <div class="card" style="padding:1.25rem">
-            <div class="card-title" style="margin-bottom:.75rem">📈 Trend Across Weeks <span style="font-size:.72rem;font-weight:400;color:var(--grey-400)">— hover a dot to see agent + value</span></div>
-            <div id="vol-line-wrap" style="width:100%;min-height:260px"></div>
+          <div class="card" style="padding:1.25rem;min-width:0;overflow:hidden">
+            <div class="card-title" style="margin-bottom:.75rem">📈 Trend Across Weeks <span style="font-size:.72rem;font-weight:400;color:var(--grey-400)">— hover dots for name + value</span></div>
+            <div id="vol-line-wrap" style="width:100%;min-width:0"></div>
           </div>
         </div>
         <!-- Heatmap -->
-        <div class="card" style="padding:1.25rem;margin-bottom:1.5rem">
+        <div class="card" style="padding:1.25rem;margin-bottom:1.5rem;min-width:0;overflow:hidden">
           <div class="card-title" style="margin-bottom:1rem">🌡️ Daily Heatmap <span style="font-weight:400;color:var(--grey-400);font-size:.78rem">— darker = higher volume</span></div>
-          <div id="vol-heatmap"></div>
+          <div id="vol-heatmap" style="overflow-x:auto"></div>
         </div>
         <!-- Team share donuts row -->
-        <div class="card" style="padding:1.25rem;margin-bottom:1.5rem">
+        <div class="card" style="padding:1.25rem;margin-bottom:1.5rem;min-width:0;overflow:hidden">
           <div class="card-title" style="margin-bottom:.75rem">🍩 Team Share per Week</div>
           <div id="vol-donuts" style="display:flex;flex-wrap:wrap;gap:1.5rem;align-items:flex-start"></div>
         </div>
         <!-- Month-over-month comparison -->
-        <div class="card" id="vol-mom-card" style="padding:1.25rem">
+        <div class="card" id="vol-mom-card" style="padding:1.25rem;min-width:0;overflow:hidden">
           <div class="card-title" style="margin-bottom:1rem">📅 Month-over-Month</div>
-          <div id="vol-mom"></div>
+          <div id="vol-mom" style="overflow-x:auto"></div>
         </div>
       </div>
 
@@ -2467,25 +2467,33 @@ function buildChart(containerId,agents,weeks,type){
   const isDark=document.body.getAttribute('data-theme')==='dark';
   const textCol=isDark?'#94a3b8':'#64748b';
   const gridCol=isDark?'rgba(255,255,255,.07)':'rgba(0,0,0,.08)';
-  const bgCard=isDark?'#1e293b':'#ffffff';
 
-  const pad={l:48,r:16,t:16,b:72};
-  const H=260;
+  const pad={l:52,r:20,t:16,b:72};
+  const H=270;
   const nA=agents.length;
   const n=weeks.length;
 
-  // For bar: each group needs enough px — min 14px per bar
-  const minBarW=14, barGap=3, groupGap=18;
+  // Available width: walk up to find a sized ancestor
+  function availW(el){
+    let e=el;
+    while(e){const w=e.getBoundingClientRect().width;if(w>0) return w;e=e.parentElement;}
+    return 700;
+  }
+  // Subtract card padding (1.25rem*2 ≈ 40px)
+  const parentW=Math.max(availW(container)-40, 300);
+
+  // For bar: each group needs enough px — min 16px per bar
+  const minBarW=16, barGap=4, groupGap=20;
   const groupW_bar=nA*minBarW+(nA-1)*barGap+groupGap;
   const canvasW=type==='bar'
-    ? Math.max(pad.l+pad.r+n*groupW_bar, container.offsetWidth||600)
-    : container.offsetWidth||600;
+    ? Math.max(pad.l+pad.r+n*groupW_bar, parentW)
+    : parentW;
   const chartW=canvasW-pad.l-pad.r;
   const chartH=H-pad.t-pad.b;
 
-  // Scrollable wrapper for bar
+  // Scrollable wrapper
   const scroll=document.createElement('div');
-  scroll.style.cssText='overflow-x:auto;overflow-y:visible;width:100%;position:relative;';
+  scroll.style.cssText='overflow-x:auto;overflow-y:hidden;width:100%;max-width:100%;position:relative;';
   container.appendChild(scroll);
 
   const canvas=document.createElement('canvas');
